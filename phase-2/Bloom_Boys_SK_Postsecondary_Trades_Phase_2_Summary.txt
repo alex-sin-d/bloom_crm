@@ -1,0 +1,55 @@
+Bloom Boys Saskatchewan Postsecondary, Trades and Ceremony Research — Phase 2
+Verified: 2026-06-26
+
+VALIDATION
+- Every required CSV data cell is populated.
+- Unavailable fields contain an explicit research-status note; no silent blanks are used.
+- No email address was inferred from a naming pattern.
+- Historical and estimated event timing is labelled.
+- The original Phase 1 workbook was not present; PHASE 1 CONNECTIONS is provisional pending reconciliation.
+
+COUNTS
+- Date verified: 2026-06-26
+- Institutions and major organizations researched: 24
+- Contacts: 141
+- Named contacts: 65
+- Operational/venue/procurement/partnership contacts: 87
+- Senior influence records: 25
+- Verified personal emails: 9
+- Verified departmental emails: 45
+- Departmental/general email routes: 75
+- Contacts requiring phone/contact-form research: 57
+- Convocations and ceremonies identified: 44
+- Venues identified: 17
+- Student organizations identified: 13
+- Trades and professional bodies identified: 20
+- Tier 1 institution/organization opportunities: 4
+- Tier 2 institution/organization opportunities: 10
+- Priority outreach contacts ranked: 100
+- Research gaps documented: 32
+- Phase 1 connections: 20
+
+FIRST TEN CONTACTS TO APPROACH
+1. University of Regina Convocation Coordinator — University of Regina — Convocation Coordinator — score 100
+2. USask Convocation Office — University of Saskatchewan — Convocation departmental contact — score 99
+3. SIIT Advancement Office — Saskatchewan Indian Institute of Technologies — Advancement departmental contact — score 99
+4. TCU Place Event Sales — TCU Place — Venue sales contact — score 99
+5. Saskatchewan Polytechnic Campus Store — Saskatchewan Polytechnic — Official campus retail contact — score 98
+6. Merlis Belsher Place Event Booking — Merlis Belsher Place — Venue booking contact — score 98
+7. Saskatchewan Polytechnic Convocation Office — Saskatchewan Polytechnic — Convocation departmental contact — score 97
+8. Prairieland Park Event Booking — Prairieland Park — Venue booking contact — score 97
+9. First Nations University Convocation Office — First Nations University of Canada — Convocation departmental contact — score 96
+10. University of Regina Graduation Office — University of Regina — Graduation departmental contact — score 95
+
+RECOMMENDED OUTREACH ORDER
+1. University of Regina Convocation Coordinator and Graduation Office.
+2. SIIT Advancement and Prairieland Park Event Booking.
+3. TCU Place Event Sales and Merlis Belsher Place Event Booking.
+4. Saskatchewan Polytechnic Convocation and Campus Store as a supplier/white-label partnership.
+5. First Nations University Convocation to clarify its current product operator.
+6. SATCC Celebration Dinner and CPA Saskatchewan.
+7. Suncrest, Carlton Trail, North West and Great Plains College.
+8. Faculty-level Nursing, Medicine, Veterinary Medicine, Engineering and JSGS ceremonies.
+
+SCORING
+Scores are practical prioritization judgments using scale, attendance, product fit, decision-maker access, approval likelihood, annual value, travel, venue feasibility, incumbent risk, preorder potential and information quality.
