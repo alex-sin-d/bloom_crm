@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "frontend:test": "tsc -p tsconfig.frontend-tests.json && node --test .frontend-test-dist/tests/frontend/*.test.js",
     "importer:build": "tsc -p tsconfig.importer.json",
     "importer:test": "tsc -p tsconfig.importer.json && node --test .importer-dist/scripts/importer/__tests__/*.test.js",
     "importer:validate": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/cli.js validate",

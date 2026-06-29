@@ -1,19 +1,21 @@
-import { PlaceholderPage } from "@/components/ui/placeholder-page";
+import { DashboardPanels } from "@/components/crm/dashboard-panels";
+import { PageHeader } from "@/components/crm/page-header";
+import { requireAuthorizedSession } from "@/lib/auth/session";
+import { getDashboardSummary } from "@/lib/crm/dashboard-queries";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  await requireAuthorizedSession();
+
+  const summary = await getDashboardSummary();
+
   return (
-    <PlaceholderPage
-      eyebrow="First slice"
-      title="Dashboard"
-      description="Actionable work starts here: follow-ups, overdue tasks, recently logged replies, approval waits, 2027 ceremonies, and workload balance."
-      sections={[
-        "Follow-ups due today",
-        "Overdue tasks",
-        "Recently logged replies",
-        "Tier 1 not contacted",
-        "Waiting for approval",
-        "Upcoming 2027 ceremonies"
-      ]}
-    />
+    <section className="mx-auto max-w-7xl">
+      <PageHeader
+        eyebrow="Start here"
+        title="Bloom Boys CRM"
+        subtitle="See what needs attention, review possible opportunities, and open the active opportunities Bloom Boys has already chosen to pursue."
+      />
+      <DashboardPanels summary={summary} />
+    </section>
   );
 }

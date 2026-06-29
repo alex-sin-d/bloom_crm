@@ -9,9 +9,9 @@ export default async function ReviewItemPage({ params }: ReviewItemPageProps) {
 
   return (
     <PlaceholderPage
-      eyebrow="Data Review"
-      title={`Review item ${reviewItemId}`}
-      description="Review item detail will show the issue, supporting source data, recommendation, and explicit decision controls."
+      eyebrow="Data issues"
+      title={`Data issue ${reviewItemId}`}
+      description="This future page will show the issue, supporting source data, recommendation, and explicit decision controls."
       sections={["Issue", "Source evidence", "Recommendation", "Decision", "Audit"]}
     />
   );

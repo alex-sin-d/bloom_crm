@@ -12,9 +12,11 @@ export function PlaceholderPage({
   return (
     <section className="mx-auto max-w-6xl">
       <div className="mb-6">
-        <p className="text-sm font-semibold text-brand-forest">{eyebrow}</p>
+        <p className="text-sm font-semibold text-brand-forest">Coming soon · {eyebrow}</p>
         <h1 className="mt-2 text-3xl font-semibold text-text-heading">{title}</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-text-muted">{description}</p>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-text-muted">
+          This page is not functional in the current local frontend. {description}
+        </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -24,7 +26,7 @@ export function PlaceholderPage({
             key={section}
           >
             <h2 className="text-base font-semibold text-text-heading">{section}</h2>
-            <p className="mt-2 text-sm leading-6 text-text-muted">Ready for controlled implementation.</p>
+            <p className="mt-2 text-sm leading-6 text-text-muted">Planned for a later pass.</p>
           </article>
         ))}
       </div>
