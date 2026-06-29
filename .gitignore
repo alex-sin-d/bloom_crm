@@ -27,6 +27,8 @@ pnpm-debug.log*
 coverage/
 playwright-report/
 test-results/
+.frontend-test-dist/
+.playwright-mcp/
 
 # vercel
 .vercel/
