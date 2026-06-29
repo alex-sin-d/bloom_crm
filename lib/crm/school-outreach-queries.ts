@@ -16,10 +16,12 @@ import type {
   OpportunityApprovalItemRow,
   OpportunityListItem,
   OpportunityRow,
+  OrganizationOutreachRow,
   OrganizationRow,
   TaskRow,
   VenueRow
 } from "@/lib/crm/types";
+import type { Json } from "@/lib/supabase/database.types";
 
 export const SCHOOL_OUTREACH_FILTERS = [
   "all",
@@ -102,6 +104,47 @@ export type UnlinkedSchoolSummary = {
   website: string | null;
 };
 
+/**
+ * Hydrated primary/backup contact for the Contacts and outreach summary panel.
+ */
+export type PrimaryContactDetail = {
+  contactRoleId: string;
+  label: string;
+  roleTitle: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+/**
+ * Contacts and outreach summary for the top panel on division and school pages.
+ */
+export type OutreachSummary = {
+  outreachRow: OrganizationOutreachRow | null;
+  primaryContact: PrimaryContactDetail | null;
+  backupContact: PrimaryContactDetail | null;
+  lastContactAt: string | null;
+  nextFollowUp: TaskRow | null;
+};
+
+/**
+ * A grouped contact section shown in the contacts panel.
+ * "operational" = contacts with usable email/phone (expanded by default)
+ * "other" = known contacts with no contact info (collapsed by default)
+ * "trustees" = board members / trustees (collapsed by default)
+ */
+export type ContactGroupKind = "operational" | "other" | "trustees";
+
+export type ContactGroup = {
+  kind: ContactGroupKind;
+  contacts: ContactSummary[];
+};
+
+/** Contact groupings produced for the school page: school vs division contacts */
+export type SchoolContactGroupings = {
+  schoolGroups: ContactGroup[];
+  divisionGroups: ContactGroup[];
+};
+
 export type SchoolOutreachOverview = {
   divisions: DivisionSummary[];
   filters: SchoolOutreachSearch;
@@ -117,10 +160,13 @@ export type SchoolOutreachOverview = {
 export type DivisionDetail = {
   activities: ActivityRow[];
   approvals: OpportunityApprovalItemRow[];
+  collapsePreferences: Json | null;
+  contactGroups: ContactGroup[];
   contacts: ContactSummary[];
   division: OrganizationRow;
   filters: Pick<SchoolOutreachSearch, "q">;
   opportunities: OpportunityListItem[];
+  outreachSummary: OutreachSummary;
   schoolGroups: SchoolCityGroup[];
   tasks: TaskRow[];
   totals: {
@@ -133,12 +179,15 @@ export type DivisionDetail = {
 export type SchoolDetail = {
   activities: ActivityRow[];
   approvals: OpportunityApprovalItemRow[];
+  collapsePreferences: Json | null;
   contacts: ContactSummary[];
+  contactGroupings: SchoolContactGroupings;
   dataReviewItems: DataReviewItemRow[];
   division: OrganizationRow | null;
   events: EventRow[];
   evidence: EvidenceSummary[];
   opportunities: OpportunityListItem[];
+  outreachSummary: OutreachSummary;
   school: OrganizationRow;
   tasks: TaskRow[];
   venuesById: Map<string, VenueRow>;
@@ -736,6 +785,178 @@ function contactMaps(contacts: ContactSummary[]) {
   };
 }
 
+const TRUSTEE_CATEGORIES: Set<ContactRoleRow["contact_category"]> = new Set([
+  "approval_authority",
+  "influence"
+]);
+
+/**
+ * Split a flat contact list into operational / other / trustees groups.
+ * Operational: contacts with at least one email or phone method.
+ * Trustees: contacts with approval_authority or influence category.
+ * Other: remaining contacts with no usable methods.
+ */
+function groupContactsByKind(contacts: ContactSummary[]): ContactGroup[] {
+  const operational: ContactSummary[] = [];
+  const other: ContactSummary[] = [];
+  const trustees: ContactSummary[] = [];
+
+  for (const contact of contacts) {
+    const isTrustee =
+      contact.category !== "departmental_contact" &&
+      TRUSTEE_CATEGORIES.has(contact.category as ContactRoleRow["contact_category"]);
+
+    if (isTrustee) {
+      trustees.push(contact);
+      continue;
+    }
+
+    const hasContactInfo = contact.methods.some(
+      (m) => m.method_type === "email" || m.method_type === "phone"
+    );
+
+    if (hasContactInfo) {
+      operational.push(contact);
+    } else {
+      other.push(contact);
+    }
+  }
+
+  const groups: ContactGroup[] = [];
+  if (operational.length > 0) groups.push({ kind: "operational", contacts: operational });
+  if (other.length > 0) groups.push({ kind: "other", contacts: other });
+  if (trustees.length > 0) groups.push({ kind: "trustees", contacts: trustees });
+  return groups;
+}
+
+/**
+ * Load the organization_outreach row and resolve primary/backup contact details.
+ */
+async function loadOutreachSummary(
+  supabase: ServerSupabaseClient,
+  organizationId: string,
+  allActivities: ActivityRow[],
+  allTasks: TaskRow[]
+): Promise<OutreachSummary> {
+  const { data: outreachRow } = await supabase
+    .from("organization_outreach")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  async function resolveContactDetail(
+    contactRoleId: string | null | undefined
+  ): Promise<PrimaryContactDetail | null> {
+    if (!contactRoleId) return null;
+
+    const { data: role } = await supabase
+      .from("contact_roles")
+      .select("id,person_id,departmental_contact_id,role_title,department,contact_category")
+      .eq("id", contactRoleId)
+      .maybeSingle();
+
+    if (!role) return null;
+
+    let label = "Contact";
+    if (role.person_id) {
+      const { data: person } = await supabase
+        .from("people")
+        .select("first_name,last_name")
+        .eq("id", role.person_id)
+        .maybeSingle();
+      if (person) {
+        label = [person.first_name, person.last_name].filter(Boolean).join(" ") || "Contact";
+      }
+    } else if (role.departmental_contact_id) {
+      const { data: dept } = await supabase
+        .from("departmental_contacts")
+        .select("display_name")
+        .eq("id", role.departmental_contact_id)
+        .maybeSingle();
+      if (dept) label = dept.display_name;
+    }
+
+    const { data: methods } = await supabase
+      .from("contact_methods")
+      .select("method_type,parsed_value,raw_value")
+      .or(
+        role.person_id
+          ? `person_id.eq.${role.person_id},contact_role_id.eq.${role.id}`
+          : `departmental_contact_id.eq.${role.departmental_contact_id},contact_role_id.eq.${role.id}`
+      )
+      .in("method_type", ["email", "phone"])
+      .is("archived_at", null);
+
+    const email =
+      (methods ?? []).find((m) => m.method_type === "email")?.parsed_value ??
+      (methods ?? []).find((m) => m.method_type === "email")?.raw_value ??
+      null;
+    const phone =
+      (methods ?? []).find((m) => m.method_type === "phone")?.parsed_value ??
+      (methods ?? []).find((m) => m.method_type === "phone")?.raw_value ??
+      null;
+
+    return {
+      contactRoleId: role.id,
+      label,
+      roleTitle: role.role_title ?? role.department ?? null,
+      email,
+      phone
+    };
+  }
+
+  const [primaryContact, backupContact] = await Promise.all([
+    resolveContactDetail(outreachRow?.primary_contact_role_id),
+    resolveContactDetail(outreachRow?.backup_contact_role_id)
+  ]);
+
+  const orgActivities = allActivities.filter(
+    (a) => a.organization_id === organizationId
+  );
+  const lastContactAt =
+    orgActivities
+      .filter((a) =>
+        ["email_sent", "email_received", "call_attempted", "call_completed", "voicemail_left"].includes(
+          a.activity_type
+        )
+      )
+      .sort((a, b) => b.activity_at.localeCompare(a.activity_at))[0]?.activity_at ?? null;
+
+  const nextFollowUp =
+    allTasks
+      .filter(
+        (t) =>
+          t.organization_id === organizationId &&
+          t.task_kind === "follow_up" &&
+          !["completed", "cancelled"].includes(t.status) &&
+          t.due_date !== null
+      )
+      .sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""))[0] ?? null;
+
+  return {
+    outreachRow: outreachRow ?? null,
+    primaryContact,
+    backupContact,
+    lastContactAt,
+    nextFollowUp
+  };
+}
+
+/**
+ * Load the per-user collapse preferences from profile_preferences.
+ */
+async function loadCollapsePreferences(
+  supabase: ServerSupabaseClient,
+  profileId: string
+): Promise<Json | null> {
+  const { data } = await supabase
+    .from("profile_preferences")
+    .select("other_display_preferences")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  return data?.other_display_preferences ?? null;
+}
+
 function approvalIdsFor(opportunities: OpportunityListItem[]) {
   return opportunities.map((opportunity) => opportunity.id);
 }
@@ -1028,7 +1249,8 @@ export async function getSchoolOutreachOverview(
 
 export async function getSchoolDivisionDetail(
   divisionId: string,
-  filters: Pick<SchoolOutreachSearch, "q">
+  filters: Pick<SchoolOutreachSearch, "q">,
+  profileId?: string
 ): Promise<DivisionDetail | null> {
   if (!hasSupabaseEnv()) {
     return null;
@@ -1081,27 +1303,39 @@ export async function getSchoolDivisionDetail(
   const relatedOpportunityIds = [...divisionOpportunityRows, ...schoolOpportunityRows].map(
     (opportunity) => opportunity.id
   );
-  const activities = getActivitiesFor({
+  const allActivitiesForDiv = getActivitiesFor({
     activities: data.activities,
     opportunityIds: relatedOpportunityIds,
     organizationId: divisionId
-  }).slice(0, 10);
-  const tasks = sortTasks(
+  });
+  const activities = allActivitiesForDiv.slice(0, 10);
+  const allTasksForDiv = sortTasks(
     getTasksFor({ organizationId: divisionId, opportunityIds: relatedOpportunityIds, tasks: data.tasks })
-  ).slice(0, 10);
+  );
+  const tasks = allTasksForDiv.slice(0, 10);
   const approvals = await loadApprovals(supabase, approvalIdsFor(divisionOpportunities));
+
+  const divisionContacts = contacts.filter(
+    (contact) =>
+      contact.organizationId === divisionId ||
+      (contact.opportunityId ? divisionOpportunityIds.includes(contact.opportunityId) : false)
+  );
+
+  const [outreachSummary, collapsePreferences] = await Promise.all([
+    loadOutreachSummary(supabase, divisionId, data.activities, data.tasks),
+    profileId ? loadCollapsePreferences(supabase, profileId) : Promise.resolve(null)
+  ]);
 
   return {
     activities,
     approvals,
-    contacts: contacts.filter(
-      (contact) =>
-        contact.organizationId === divisionId ||
-        (contact.opportunityId ? divisionOpportunityIds.includes(contact.opportunityId) : false)
-    ),
+    collapsePreferences,
+    contactGroups: groupContactsByKind(divisionContacts),
+    contacts: divisionContacts,
     division,
     filters,
     opportunities: divisionOpportunities,
+    outreachSummary,
     schoolGroups: groupSchoolsByCity(schoolRows),
     tasks,
     totals: {
@@ -1117,7 +1351,10 @@ export async function getSchoolDivisionDetail(
   };
 }
 
-export async function getSchoolDetail(schoolId: string): Promise<SchoolDetail | null> {
+export async function getSchoolDetail(
+  schoolId: string,
+  profileId?: string
+): Promise<SchoolDetail | null> {
   if (!hasSupabaseEnv()) {
     return null;
   }
@@ -1140,23 +1377,50 @@ export async function getSchoolDetail(schoolId: string): Promise<SchoolDetail | 
   const events = getEventsForSchool(data, schoolId);
   const eventIds = events.map((event) => event.id);
   const venueIds = uniqueValues(events.map((event) => event.venue_id));
-  const contacts = await loadContactSummaries(supabase, {
-    opportunityIds,
-    organizationIds: [schoolId]
-  });
-  const [approvals, dataReviewItems, organizationEvidence] = await Promise.all([
-    loadApprovals(supabase, opportunityIds),
-    loadDataReviewItems(supabase, [
-      { recordId: schoolId, tableName: "organizations" },
-      ...opportunityIds.map((recordId) => ({ recordId, tableName: "opportunities" })),
-      ...eventIds.map((recordId) => ({ recordId, tableName: "events" })),
-      ...venueIds.map((recordId) => ({ recordId, tableName: "venues" }))
-    ]),
-    loadEvidenceForTargets(supabase, [
-      { recordId: schoolId, tableName: "organizations" },
-      ...eventIds.map((recordId) => ({ recordId, tableName: "events" }))
-    ])
+
+  // Load school-direct contacts + division-level contacts separately
+  const divisionId = divisionEntry?.[0] ?? null;
+  const divisionOrganizationIds = divisionId ? [divisionId] : [];
+  const divisionOpportunityRows = divisionId
+    ? getOpportunityRowsForOrganization(data, divisionId)
+    : [];
+
+  const [schoolContacts, divisionContacts] = await Promise.all([
+    loadContactSummaries(supabase, {
+      opportunityIds,
+      organizationIds: [schoolId]
+    }),
+    divisionId
+      ? loadContactSummaries(supabase, {
+          opportunityIds: divisionOpportunityRows.map((o) => o.id),
+          organizationIds: divisionOrganizationIds
+        })
+      : Promise.resolve([])
   ]);
+
+  const allContacts = [...schoolContacts, ...divisionContacts];
+
+  const [approvals, dataReviewItems, organizationEvidence, outreachSummary, collapsePreferences] =
+    await Promise.all([
+      loadApprovals(supabase, opportunityIds),
+      loadDataReviewItems(supabase, [
+        { recordId: schoolId, tableName: "organizations" },
+        ...opportunityIds.map((recordId) => ({ recordId, tableName: "opportunities" })),
+        ...eventIds.map((recordId) => ({ recordId, tableName: "events" })),
+        ...venueIds.map((recordId) => ({ recordId, tableName: "venues" }))
+      ]),
+      loadEvidenceForTargets(supabase, [
+        { recordId: schoolId, tableName: "organizations" },
+        ...eventIds.map((recordId) => ({ recordId, tableName: "events" }))
+      ]),
+      loadOutreachSummary(supabase, schoolId, data.activities, data.tasks),
+      profileId ? loadCollapsePreferences(supabase, profileId) : Promise.resolve(null)
+    ]);
+
+  const contactGroupings: SchoolContactGroupings = {
+    schoolGroups: groupContactsByKind(schoolContacts),
+    divisionGroups: groupContactsByKind(divisionContacts)
+  };
 
   return {
     activities: getActivitiesFor({
@@ -1165,7 +1429,9 @@ export async function getSchoolDetail(schoolId: string): Promise<SchoolDetail | 
       organizationId: schoolId
     }),
     approvals,
-    contacts,
+    collapsePreferences,
+    contacts: allContacts,
+    contactGroupings,
     dataReviewItems,
     division,
     events,
@@ -1174,6 +1440,7 @@ export async function getSchoolDetail(schoolId: string): Promise<SchoolDetail | 
       ...opportunities.flatMap((opportunity) => opportunity.evidence)
     ],
     opportunities,
+    outreachSummary,
     school,
     tasks: sortTasks(getTasksFor({ organizationId: schoolId, opportunityIds, tasks: data.tasks })),
     venueOrganizationsById: data.venueOrganizationsById,

@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "outDir": ".frontend-test-dist",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": [
+    "tests/frontend/**/*.ts",
+    "lib/crm/add-to-pipeline.ts",
+    "lib/crm/business-days.ts",
+    "lib/crm/collapse-preferences.ts",
+    "lib/crm/contact-duplicates.ts",
+    "lib/crm/outreach-labels.ts",
+    "lib/crm/outreach-rules.ts",
+    "lib/crm/types.ts",
+    "lib/supabase/database.types.ts"
+  ]
+}

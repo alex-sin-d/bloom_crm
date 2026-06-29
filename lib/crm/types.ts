@@ -20,6 +20,8 @@ export type ContactRoleRow = Database["public"]["Tables"]["contact_roles"]["Row"
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 export type DataReviewItemRow = Database["public"]["Tables"]["data_review_items"]["Row"];
 export type ResearchGapRow = Database["public"]["Tables"]["research_gaps"]["Row"];
+export type OrganizationOutreachRow =
+  Database["public"]["Tables"]["organization_outreach"]["Row"];
 
 export type ProfileSummary = {
   displayName: string;

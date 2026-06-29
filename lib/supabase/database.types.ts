@@ -56,6 +56,7 @@ export type Database = {
           summary: string | null
           updated_at: string
           updated_by: string | null
+          direction: Database["public"]["Enums"]["activity_direction"] | null
           user_id: string
           visibility: Database["public"]["Enums"]["activity_visibility"]
         }
@@ -70,6 +71,7 @@ export type Database = {
           contact_role_id?: string | null
           created_at?: string
           created_by?: string | null
+          direction?: Database["public"]["Enums"]["activity_direction"] | null
           follow_up_date?: string | null
           id?: string
           next_action?: string | null
@@ -94,6 +96,7 @@ export type Database = {
           contact_role_id?: string | null
           created_at?: string
           created_by?: string | null
+          direction?: Database["public"]["Enums"]["activity_direction"] | null
           follow_up_date?: string | null
           id?: string
           next_action?: string | null
@@ -1617,6 +1620,97 @@ export type Database = {
           },
         ]
       }
+      organization_outreach: {
+        Row: {
+          backup_contact_role_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+          outreach_route: Database["public"]["Enums"]["outreach_route"]
+          outreach_status: Database["public"]["Enums"]["outreach_status"]
+          primary_contact_role_id: string | null
+          status_changed_at: string | null
+          status_changed_by: string | null
+          status_note: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          backup_contact_role_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+          outreach_route?: Database["public"]["Enums"]["outreach_route"]
+          outreach_status?: Database["public"]["Enums"]["outreach_status"]
+          primary_contact_role_id?: string | null
+          status_changed_at?: string | null
+          status_changed_by?: string | null
+          status_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          backup_contact_role_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+          outreach_route?: Database["public"]["Enums"]["outreach_route"]
+          outreach_status?: Database["public"]["Enums"]["outreach_status"]
+          primary_contact_role_id?: string | null
+          status_changed_at?: string | null
+          status_changed_by?: string | null
+          status_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_outreach_backup_contact_role_id_fkey"
+            columns: ["backup_contact_role_id"]
+            isOneToOne: false
+            referencedRelation: "contact_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_primary_contact_role_id_fkey"
+            columns: ["primary_contact_role_id"]
+            isOneToOne: false
+            referencedRelation: "contact_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_status_changed_by_fkey"
+            columns: ["status_changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       people: {
         Row: {
           archive_reason: string | null
@@ -2839,6 +2933,7 @@ export type Database = {
       }
     }
     Enums: {
+      activity_direction: "inbound" | "outbound"
       activity_type:
         | "email_sent"
         | "email_received"
@@ -3090,6 +3185,19 @@ export type Database = {
         | "relationship_first"
         | "mixed"
         | "unknown"
+      outreach_route:
+        | "not_decided"
+        | "division_first"
+        | "school_directly"
+        | "both"
+      outreach_status:
+        | "not_contacted"
+        | "awaiting_reply"
+        | "follow_up_due"
+        | "reply_received"
+        | "spoke_by_phone"
+        | "call_back_requested"
+        | "not_pursuing"
       permission_level: "owner"
       pipeline_stage:
         | "research_only"
@@ -3340,6 +3448,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      activity_direction: ["inbound", "outbound"],
       activity_type: [
         "email_sent",
         "email_received",
@@ -3611,6 +3720,21 @@ export const Constants = {
         "church_parish",
         "government_education_authority",
         "other",
+      ],
+      outreach_route: [
+        "not_decided",
+        "division_first",
+        "school_directly",
+        "both",
+      ],
+      outreach_status: [
+        "not_contacted",
+        "awaiting_reply",
+        "follow_up_due",
+        "reply_received",
+        "spoke_by_phone",
+        "call_back_requested",
+        "not_pursuing",
       ],
       outreach_path: [
         "school_first",
