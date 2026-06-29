@@ -159,6 +159,60 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action_type: Database["public"]["Enums"]["audit_action_type"]
+          after_value: Json | null
+          before_value: Json | null
+          created_at: string
+          field_name: string | null
+          id: string
+          reason: string | null
+          record_id: string
+          record_type_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action_type: Database["public"]["Enums"]["audit_action_type"]
+          after_value?: Json | null
+          before_value?: Json | null
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          reason?: string | null
+          record_id: string
+          record_type_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: Database["public"]["Enums"]["audit_action_type"]
+          after_value?: Json | null
+          before_value?: Json | null
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          reason?: string | null
+          record_id?: string
+          record_type_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_record_type_id_fkey"
+            columns: ["record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_methods: {
         Row: {
           archive_reason: string | null
@@ -429,6 +483,118 @@ export type Database = {
           },
         ]
       }
+      data_review_items: {
+        Row: {
+          created_at: string
+          current_value: string | null
+          decision_notes: string | null
+          duplicate_candidate_id: string | null
+          field_conflict_id: string | null
+          field_name: string | null
+          id: string
+          issue_type: Database["public"]["Enums"]["data_review_issue_type"]
+          normalized_value: string | null
+          raw_value: string | null
+          recommendation: string | null
+          record_id: string | null
+          record_type_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          review_status: Database["public"]["Enums"]["data_review_status"]
+          severity: Database["public"]["Enums"]["review_severity"]
+          source_row_id: string | null
+          unresolved_relationship_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_value?: string | null
+          decision_notes?: string | null
+          duplicate_candidate_id?: string | null
+          field_conflict_id?: string | null
+          field_name?: string | null
+          id?: string
+          issue_type: Database["public"]["Enums"]["data_review_issue_type"]
+          normalized_value?: string | null
+          raw_value?: string | null
+          recommendation?: string | null
+          record_id?: string | null
+          record_type_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_status?: Database["public"]["Enums"]["data_review_status"]
+          severity?: Database["public"]["Enums"]["review_severity"]
+          source_row_id?: string | null
+          unresolved_relationship_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_value?: string | null
+          decision_notes?: string | null
+          duplicate_candidate_id?: string | null
+          field_conflict_id?: string | null
+          field_name?: string | null
+          id?: string
+          issue_type?: Database["public"]["Enums"]["data_review_issue_type"]
+          normalized_value?: string | null
+          raw_value?: string | null
+          recommendation?: string | null
+          record_id?: string | null
+          record_type_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_status?: Database["public"]["Enums"]["data_review_status"]
+          severity?: Database["public"]["Enums"]["review_severity"]
+          source_row_id?: string | null
+          unresolved_relationship_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_review_items_duplicate_candidate_id_fkey"
+            columns: ["duplicate_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "duplicate_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_review_items_field_conflict_id_fkey"
+            columns: ["field_conflict_id"]
+            isOneToOne: false
+            referencedRelation: "field_conflicts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_review_items_record_type_id_fkey"
+            columns: ["record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_review_items_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_review_items_source_row_id_fkey"
+            columns: ["source_row_id"]
+            isOneToOne: false
+            referencedRelation: "source_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_review_items_unresolved_relationship_id_fkey"
+            columns: ["unresolved_relationship_id"]
+            isOneToOne: false
+            referencedRelation: "unresolved_relationships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departmental_contacts: {
         Row: {
           archive_reason: string | null
@@ -503,6 +669,95 @@ export type Database = {
           {
             foreignKeyName: "departmental_contacts_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duplicate_candidate_records: {
+        Row: {
+          created_at: string
+          duplicate_candidate_id: string
+          id: string
+          notes: string | null
+          record_id: string
+          record_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          duplicate_candidate_id: string
+          id?: string
+          notes?: string | null
+          record_id: string
+          record_type_id: string
+        }
+        Update: {
+          created_at?: string
+          duplicate_candidate_id?: string
+          id?: string
+          notes?: string | null
+          record_id?: string
+          record_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplicate_candidate_records_duplicate_candidate_id_fkey"
+            columns: ["duplicate_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "duplicate_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_candidate_records_record_type_id_fkey"
+            columns: ["record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duplicate_candidates: {
+        Row: {
+          candidate_type: Database["public"]["Enums"]["duplicate_candidate_type"]
+          confidence: Database["public"]["Enums"]["duplicate_candidate_confidence"]
+          created_at: string
+          decision_notes: string | null
+          id: string
+          normalized_key: string
+          review_status: Database["public"]["Enums"]["duplicate_review_status"]
+          reviewed_at: string | null
+          reviewed_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          candidate_type: Database["public"]["Enums"]["duplicate_candidate_type"]
+          confidence?: Database["public"]["Enums"]["duplicate_candidate_confidence"]
+          created_at?: string
+          decision_notes?: string | null
+          id?: string
+          normalized_key: string
+          review_status?: Database["public"]["Enums"]["duplicate_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          candidate_type?: Database["public"]["Enums"]["duplicate_candidate_type"]
+          confidence?: Database["public"]["Enums"]["duplicate_candidate_confidence"]
+          created_at?: string
+          decision_notes?: string | null
+          id?: string
+          normalized_key?: string
+          review_status?: Database["public"]["Enums"]["duplicate_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplicate_candidates_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -633,6 +888,89 @@ export type Database = {
           },
         ]
       }
+      field_conflicts: {
+        Row: {
+          created_at: string
+          current_value: Json | null
+          field_name: string
+          id: string
+          imported_value: Json | null
+          record_id: string
+          record_type_id: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: Database["public"]["Enums"]["review_severity"]
+          source_record_id: string | null
+          source_row_id: string | null
+          status: Database["public"]["Enums"]["field_conflict_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_value?: Json | null
+          field_name: string
+          id?: string
+          imported_value?: Json | null
+          record_id: string
+          record_type_id: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: Database["public"]["Enums"]["review_severity"]
+          source_record_id?: string | null
+          source_row_id?: string | null
+          status?: Database["public"]["Enums"]["field_conflict_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_value?: Json | null
+          field_name?: string
+          id?: string
+          imported_value?: Json | null
+          record_id?: string
+          record_type_id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: Database["public"]["Enums"]["review_severity"]
+          source_record_id?: string | null
+          source_row_id?: string | null
+          status?: Database["public"]["Enums"]["field_conflict_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_conflicts_record_type_id_fkey"
+            columns: ["record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_conflicts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_conflicts_source_record_id_fkey"
+            columns: ["source_record_id"]
+            isOneToOne: false
+            referencedRelation: "source_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_conflicts_source_row_id_fkey"
+            columns: ["source_row_id"]
+            isOneToOne: false
+            referencedRelation: "source_rows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_batch_files: {
         Row: {
           created_at: string
@@ -730,6 +1068,125 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_row_links: {
+        Row: {
+          created_at: string
+          id: string
+          link_type: Database["public"]["Enums"]["import_row_link_type"]
+          notes: string | null
+          record_id: string | null
+          record_type_id: string
+          source_row_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          link_type: Database["public"]["Enums"]["import_row_link_type"]
+          notes?: string | null
+          record_id?: string | null
+          record_type_id: string
+          source_row_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          link_type?: Database["public"]["Enums"]["import_row_link_type"]
+          notes?: string | null
+          record_id?: string | null
+          record_type_id?: string
+          source_row_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_row_links_record_type_id_fkey"
+            columns: ["record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_row_links_source_row_id_fkey"
+            columns: ["source_row_id"]
+            isOneToOne: false
+            referencedRelation: "source_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_row_links_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      imported_research_scores: {
+        Row: {
+          created_at: string
+          id: string
+          opportunity_id: string
+          original_score: number | null
+          original_scoring_notes: string | null
+          original_source_urls: string[]
+          original_tier: string | null
+          phase: Database["public"]["Enums"]["source_phase_folder"]
+          source_file_id: string
+          source_row_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          opportunity_id: string
+          original_score?: number | null
+          original_scoring_notes?: string | null
+          original_source_urls?: string[]
+          original_tier?: string | null
+          phase: Database["public"]["Enums"]["source_phase_folder"]
+          source_file_id: string
+          source_row_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          opportunity_id?: string
+          original_score?: number | null
+          original_scoring_notes?: string | null
+          original_source_urls?: string[]
+          original_tier?: string | null
+          phase?: Database["public"]["Enums"]["source_phase_folder"]
+          source_file_id?: string
+          source_row_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "imported_research_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "imported_research_scores_source_file_id_fkey"
+            columns: ["source_file_id"]
+            isOneToOne: false
+            referencedRelation: "source_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "imported_research_scores_source_row_id_fkey"
+            columns: ["source_row_id"]
+            isOneToOne: false
+            referencedRelation: "source_rows"
             referencedColumns: ["id"]
           },
         ]
@@ -1324,6 +1781,85 @@ export type Database = {
           },
         ]
       }
+      record_field_state: {
+        Row: {
+          created_at: string
+          current_source_record_id: string | null
+          edit_reason: string | null
+          edited_at: string | null
+          edited_by: string | null
+          field_name: string
+          field_origin: Database["public"]["Enums"]["field_origin"]
+          id: string
+          import_update_eligibility: Database["public"]["Enums"]["import_update_eligibility"]
+          last_imported_at: string | null
+          last_imported_value: Json | null
+          manually_edited: boolean
+          notes: string | null
+          record_id: string
+          record_type_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_source_record_id?: string | null
+          edit_reason?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
+          field_name: string
+          field_origin?: Database["public"]["Enums"]["field_origin"]
+          id?: string
+          import_update_eligibility?: Database["public"]["Enums"]["import_update_eligibility"]
+          last_imported_at?: string | null
+          last_imported_value?: Json | null
+          manually_edited?: boolean
+          notes?: string | null
+          record_id: string
+          record_type_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_source_record_id?: string | null
+          edit_reason?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
+          field_name?: string
+          field_origin?: Database["public"]["Enums"]["field_origin"]
+          id?: string
+          import_update_eligibility?: Database["public"]["Enums"]["import_update_eligibility"]
+          last_imported_at?: string | null
+          last_imported_value?: Json | null
+          manually_edited?: boolean
+          notes?: string | null
+          record_id?: string
+          record_type_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "record_field_state_current_source_record_id_fkey"
+            columns: ["current_source_record_id"]
+            isOneToOne: false
+            referencedRelation: "source_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "record_field_state_edited_by_fkey"
+            columns: ["edited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "record_field_state_record_type_id_fkey"
+            columns: ["record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       record_type_registry: {
         Row: {
           archived_at: string | null
@@ -1356,6 +1892,167 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      research_gaps: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          assigned_owner_id: string | null
+          best_person_to_call: string | null
+          created_at: string
+          created_by: string | null
+          event_id: string | null
+          exact_question_to_ask: string | null
+          id: string
+          missing_information: string
+          notes: string | null
+          opportunity_id: string | null
+          organization_id: string | null
+          phone_number: string | null
+          priority: Database["public"]["Enums"]["research_gap_priority"]
+          recommended_next_step: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          search_attempts: string | null
+          source_added_id: string | null
+          sources_checked: string | null
+          status: Database["public"]["Enums"]["research_gap_status"]
+          updated_at: string
+          updated_by: string | null
+          venue_id: string | null
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          assigned_owner_id?: string | null
+          best_person_to_call?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_id?: string | null
+          exact_question_to_ask?: string | null
+          id?: string
+          missing_information: string
+          notes?: string | null
+          opportunity_id?: string | null
+          organization_id?: string | null
+          phone_number?: string | null
+          priority?: Database["public"]["Enums"]["research_gap_priority"]
+          recommended_next_step?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          search_attempts?: string | null
+          source_added_id?: string | null
+          sources_checked?: string | null
+          status?: Database["public"]["Enums"]["research_gap_status"]
+          updated_at?: string
+          updated_by?: string | null
+          venue_id?: string | null
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          assigned_owner_id?: string | null
+          best_person_to_call?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_id?: string | null
+          exact_question_to_ask?: string | null
+          id?: string
+          missing_information?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          organization_id?: string | null
+          phone_number?: string | null
+          priority?: Database["public"]["Enums"]["research_gap_priority"]
+          recommended_next_step?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          search_attempts?: string | null
+          source_added_id?: string | null
+          sources_checked?: string | null
+          status?: Database["public"]["Enums"]["research_gap_status"]
+          updated_at?: string
+          updated_by?: string | null
+          venue_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_gaps_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_assigned_owner_id_fkey"
+            columns: ["assigned_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_source_added_id_fkey"
+            columns: ["source_added_id"]
+            isOneToOne: false
+            referencedRelation: "source_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_gaps_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_views: {
         Row: {
@@ -1507,6 +2204,147 @@ export type Database = {
             columns: ["last_seen_batch_id"]
             isOneToOne: false
             referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          field_name: string | null
+          id: string
+          notes: string | null
+          record_id: string
+          record_type_id: string
+          source_record_id: string
+          support_type: Database["public"]["Enums"]["source_link_support_type"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          field_name?: string | null
+          id?: string
+          notes?: string | null
+          record_id: string
+          record_type_id: string
+          source_record_id: string
+          support_type?: Database["public"]["Enums"]["source_link_support_type"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          field_name?: string | null
+          id?: string
+          notes?: string | null
+          record_id?: string
+          record_type_id?: string
+          source_record_id?: string
+          support_type?: Database["public"]["Enums"]["source_link_support_type"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_links_record_type_id_fkey"
+            columns: ["record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_links_source_record_id_fkey"
+            columns: ["source_record_id"]
+            isOneToOne: false
+            referencedRelation: "source_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_links_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_records: {
+        Row: {
+          confidence_level: Database["public"]["Enums"]["source_confidence_level"]
+          created_at: string
+          created_by: string | null
+          date_verified: string | null
+          historical_status: Database["public"]["Enums"]["source_historical_status"]
+          id: string
+          notes: string | null
+          source_row_id: string | null
+          source_text: string | null
+          source_text_hash: string | null
+          source_type: Database["public"]["Enums"]["source_record_type"]
+          source_url: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          confidence_level?: Database["public"]["Enums"]["source_confidence_level"]
+          created_at?: string
+          created_by?: string | null
+          date_verified?: string | null
+          historical_status?: Database["public"]["Enums"]["source_historical_status"]
+          id?: string
+          notes?: string | null
+          source_row_id?: string | null
+          source_text?: string | null
+          source_text_hash?: string | null
+          source_type?: Database["public"]["Enums"]["source_record_type"]
+          source_url?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          confidence_level?: Database["public"]["Enums"]["source_confidence_level"]
+          created_at?: string
+          created_by?: string | null
+          date_verified?: string | null
+          historical_status?: Database["public"]["Enums"]["source_historical_status"]
+          id?: string
+          notes?: string | null
+          source_row_id?: string | null
+          source_text?: string | null
+          source_text_hash?: string | null
+          source_type?: Database["public"]["Enums"]["source_record_type"]
+          source_url?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_records_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_records_source_row_id_fkey"
+            columns: ["source_row_id"]
+            isOneToOne: false
+            referencedRelation: "source_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_records_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1785,6 +2623,98 @@ export type Database = {
           },
         ]
       }
+      unresolved_relationships: {
+        Row: {
+          created_at: string
+          expected_target_entity: Database["public"]["Enums"]["unresolved_relationship_expected_target_entity"]
+          id: string
+          notes: string | null
+          raw_value: string
+          reason_unresolved: string | null
+          relationship_field: string
+          resolved_at: string | null
+          resolved_by: string | null
+          resolved_record_id: string | null
+          resolved_record_type_id: string | null
+          severity: Database["public"]["Enums"]["review_severity"]
+          source_row_id: string
+          status: Database["public"]["Enums"]["unresolved_relationship_status"]
+          suggested_canonical_or_alias: string | null
+          suggested_record_id: string | null
+          suggested_record_type_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expected_target_entity: Database["public"]["Enums"]["unresolved_relationship_expected_target_entity"]
+          id?: string
+          notes?: string | null
+          raw_value: string
+          reason_unresolved?: string | null
+          relationship_field: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_record_id?: string | null
+          resolved_record_type_id?: string | null
+          severity?: Database["public"]["Enums"]["review_severity"]
+          source_row_id: string
+          status?: Database["public"]["Enums"]["unresolved_relationship_status"]
+          suggested_canonical_or_alias?: string | null
+          suggested_record_id?: string | null
+          suggested_record_type_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expected_target_entity?: Database["public"]["Enums"]["unresolved_relationship_expected_target_entity"]
+          id?: string
+          notes?: string | null
+          raw_value?: string
+          reason_unresolved?: string | null
+          relationship_field?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_record_id?: string | null
+          resolved_record_type_id?: string | null
+          severity?: Database["public"]["Enums"]["review_severity"]
+          source_row_id?: string
+          status?: Database["public"]["Enums"]["unresolved_relationship_status"]
+          suggested_canonical_or_alias?: string | null
+          suggested_record_id?: string | null
+          suggested_record_type_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unresolved_relationships_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unresolved_relationships_resolved_record_type_id_fkey"
+            columns: ["resolved_record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unresolved_relationships_source_row_id_fkey"
+            columns: ["source_row_id"]
+            isOneToOne: false
+            referencedRelation: "source_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unresolved_relationships_suggested_record_type_id_fkey"
+            columns: ["suggested_record_type_id"]
+            isOneToOne: false
+            referencedRelation: "record_type_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venues: {
         Row: {
           address_line_1: string | null
@@ -1903,6 +2833,10 @@ export type Database = {
     Functions: {
       current_profile_is_active_owner: { Args: never; Returns: boolean }
       normalize_label: { Args: { value: string }; Returns: string }
+      record_reference_exists: {
+        Args: { record_id: string; record_type_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       activity_type:
@@ -1943,6 +2877,18 @@ export type Database = {
         | "rejected"
         | "expired"
         | "requires_follow_up"
+      audit_action_type:
+        | "create"
+        | "update"
+        | "archive"
+        | "restore"
+        | "merge"
+        | "unlink"
+        | "stage_change"
+        | "approval_change"
+        | "score_override"
+        | "import_update"
+        | "conflict_resolution"
       backup_status:
         | "not_checked"
         | "matches_backup"
@@ -1990,7 +2936,36 @@ export type Database = {
         | "senior_escalation"
         | "unknown"
       contact_role_status: "current" | "historical" | "unverified" | "archived"
+      data_review_issue_type:
+        | "field_conflict"
+        | "duplicate_warning"
+        | "unresolved_relationship"
+        | "import_issue"
+        | "source_conflict"
+        | "provisional_phase_1_connection"
+        | "other"
+      data_review_status:
+        | "open"
+        | "resolved"
+        | "ignored"
+        | "deferred"
+        | "superseded"
       default_pipeline_view: "table" | "kanban"
+      duplicate_candidate_confidence: "high" | "medium" | "low"
+      duplicate_candidate_type:
+        | "same_email"
+        | "same_phone"
+        | "same_name_org"
+        | "organization_alias"
+        | "venue_variant"
+        | "trustee_contact_overlap"
+      duplicate_review_status:
+        | "open"
+        | "merged"
+        | "linked_not_merged"
+        | "not_duplicate"
+        | "deferred"
+        | "superseded"
       event_confirmation_status:
         | "unknown"
         | "not_started"
@@ -2016,6 +2991,14 @@ export type Database = {
         | "student_event"
         | "venue_event"
         | "other"
+      field_conflict_status:
+        | "open"
+        | "accepted_import"
+        | "kept_current"
+        | "manual_value_entered"
+        | "ignored"
+        | "superseded"
+      field_origin: "imported" | "manual" | "system" | "mixed"
       import_file_status:
         | "seen"
         | "unchanged"
@@ -2023,6 +3006,13 @@ export type Database = {
         | "missing"
         | "failed_validation"
       import_mode: "dry_run" | "evidence_load" | "canonical_import"
+      import_row_link_type:
+        | "created"
+        | "updated"
+        | "supported"
+        | "conflicted"
+        | "skipped"
+        | "review_only"
       import_status:
         | "planned"
         | "running"
@@ -2030,6 +3020,12 @@ export type Database = {
         | "failed"
         | "cancelled"
         | "rolled_back"
+      import_update_eligibility:
+        | "eligible"
+        | "manual_lock"
+        | "conflict_review_required"
+        | "import_only"
+        | "user_only"
       opportunity_product_approval_requirement:
         | "not_required"
         | "unknown"
@@ -2118,6 +3114,16 @@ export type Database = {
       record_reference_integrity_strategy:
         | "validation_trigger"
         | "typed_table_required"
+      research_gap_priority: "critical" | "high" | "medium" | "low"
+      research_gap_status:
+        | "open"
+        | "assigned"
+        | "contact_attempted"
+        | "waiting_for_response"
+        | "resolved"
+        | "no_public_answer"
+        | "no_longer_relevant"
+      review_severity: "low" | "medium" | "high"
       saved_view_page_type:
         | "dashboard"
         | "research"
@@ -2132,8 +3138,32 @@ export type Database = {
       saved_view_status: "active" | "archived"
       saved_view_visibility: "personal" | "shared"
       sidebar_state: "expanded" | "collapsed"
+      source_confidence_level: "high" | "medium" | "low" | "unverified"
+      source_historical_status:
+        | "current"
+        | "historical"
+        | "estimated"
+        | "unknown"
+        | "conflicting"
       source_kind: "unpacked_csv"
+      source_link_support_type:
+        | "primary"
+        | "additional"
+        | "conflicting"
+        | "historical_context"
+        | "verification"
+        | "import_origin"
       source_phase_folder: "phase-1" | "phase-2"
+      source_record_type:
+        | "official_site"
+        | "directory"
+        | "policy"
+        | "event_page"
+        | "staff_page"
+        | "venue_page"
+        | "internal_note"
+        | "csv_row"
+        | "other"
       source_row_change_status:
         | "new"
         | "unchanged"
@@ -2162,6 +3192,17 @@ export type Database = {
         | "completed"
         | "blocked"
         | "cancelled"
+      unresolved_relationship_expected_target_entity:
+        | "organization"
+        | "venue"
+        | "phase_1_school_or_division"
+        | "phase_2_institution_or_venue"
+      unresolved_relationship_status:
+        | "open"
+        | "resolved"
+        | "ignored"
+        | "needs_research"
+        | "superseded"
       venue_approval_required: "yes" | "no" | "unknown" | "event_specific"
       venue_outside_vendor_status:
         | "allowed"
@@ -2340,6 +3381,19 @@ export const Constants = {
         "expired",
         "requires_follow_up",
       ],
+      audit_action_type: [
+        "create",
+        "update",
+        "archive",
+        "restore",
+        "merge",
+        "unlink",
+        "stage_change",
+        "approval_change",
+        "score_override",
+        "import_update",
+        "conflict_resolution",
+      ],
       backup_status: [
         "not_checked",
         "matches_backup",
@@ -2393,7 +3447,40 @@ export const Constants = {
         "unknown",
       ],
       contact_role_status: ["current", "historical", "unverified", "archived"],
+      data_review_issue_type: [
+        "field_conflict",
+        "duplicate_warning",
+        "unresolved_relationship",
+        "import_issue",
+        "source_conflict",
+        "provisional_phase_1_connection",
+        "other",
+      ],
+      data_review_status: [
+        "open",
+        "resolved",
+        "ignored",
+        "deferred",
+        "superseded",
+      ],
       default_pipeline_view: ["table", "kanban"],
+      duplicate_candidate_confidence: ["high", "medium", "low"],
+      duplicate_candidate_type: [
+        "same_email",
+        "same_phone",
+        "same_name_org",
+        "organization_alias",
+        "venue_variant",
+        "trustee_contact_overlap",
+      ],
+      duplicate_review_status: [
+        "open",
+        "merged",
+        "linked_not_merged",
+        "not_duplicate",
+        "deferred",
+        "superseded",
+      ],
       event_confirmation_status: [
         "unknown",
         "not_started",
@@ -2422,6 +3509,15 @@ export const Constants = {
         "venue_event",
         "other",
       ],
+      field_conflict_status: [
+        "open",
+        "accepted_import",
+        "kept_current",
+        "manual_value_entered",
+        "ignored",
+        "superseded",
+      ],
+      field_origin: ["imported", "manual", "system", "mixed"],
       import_file_status: [
         "seen",
         "unchanged",
@@ -2430,6 +3526,14 @@ export const Constants = {
         "failed_validation",
       ],
       import_mode: ["dry_run", "evidence_load", "canonical_import"],
+      import_row_link_type: [
+        "created",
+        "updated",
+        "supported",
+        "conflicted",
+        "skipped",
+        "review_only",
+      ],
       import_status: [
         "planned",
         "running",
@@ -2437,6 +3541,13 @@ export const Constants = {
         "failed",
         "cancelled",
         "rolled_back",
+      ],
+      import_update_eligibility: [
+        "eligible",
+        "manual_lock",
+        "conflict_review_required",
+        "import_only",
+        "user_only",
       ],
       opportunity_product_approval_requirement: [
         "not_required",
@@ -2535,6 +3646,17 @@ export const Constants = {
         "validation_trigger",
         "typed_table_required",
       ],
+      research_gap_priority: ["critical", "high", "medium", "low"],
+      research_gap_status: [
+        "open",
+        "assigned",
+        "contact_attempted",
+        "waiting_for_response",
+        "resolved",
+        "no_public_answer",
+        "no_longer_relevant",
+      ],
+      review_severity: ["low", "medium", "high"],
       saved_view_page_type: [
         "dashboard",
         "research",
@@ -2550,8 +3672,35 @@ export const Constants = {
       saved_view_status: ["active", "archived"],
       saved_view_visibility: ["personal", "shared"],
       sidebar_state: ["expanded", "collapsed"],
+      source_confidence_level: ["high", "medium", "low", "unverified"],
+      source_historical_status: [
+        "current",
+        "historical",
+        "estimated",
+        "unknown",
+        "conflicting",
+      ],
       source_kind: ["unpacked_csv"],
+      source_link_support_type: [
+        "primary",
+        "additional",
+        "conflicting",
+        "historical_context",
+        "verification",
+        "import_origin",
+      ],
       source_phase_folder: ["phase-1", "phase-2"],
+      source_record_type: [
+        "official_site",
+        "directory",
+        "policy",
+        "event_page",
+        "staff_page",
+        "venue_page",
+        "internal_note",
+        "csv_row",
+        "other",
+      ],
       source_row_change_status: [
         "new",
         "unchanged",
@@ -2578,6 +3727,19 @@ export const Constants = {
       ],
       task_priority: ["critical", "high", "medium", "low"],
       task_status: ["open", "in_progress", "completed", "blocked", "cancelled"],
+      unresolved_relationship_expected_target_entity: [
+        "organization",
+        "venue",
+        "phase_1_school_or_division",
+        "phase_2_institution_or_venue",
+      ],
+      unresolved_relationship_status: [
+        "open",
+        "resolved",
+        "ignored",
+        "needs_research",
+        "superseded",
+      ],
       venue_approval_required: ["yes", "no", "unknown", "event_specific"],
       venue_outside_vendor_status: [
         "allowed",

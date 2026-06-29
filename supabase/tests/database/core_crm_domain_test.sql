@@ -622,9 +622,9 @@ select ok(
     select 1
     from information_schema.tables
     where table_schema = 'public'
-      and table_name = 'imported_research_scores'
+      and table_name = 'opportunity_score_snapshots'
   ),
-  'scoring tables are deferred'
+  'score snapshots are deferred'
 );
 
 select ok(
@@ -632,9 +632,9 @@ select ok(
     select 1
     from information_schema.tables
     where table_schema = 'public'
-      and table_name = 'data_review_items'
+      and table_name = 'opportunity_score_overrides'
   ),
-  'Data Review tables are deferred'
+  'score overrides are deferred'
 );
 
 select * from finish();
