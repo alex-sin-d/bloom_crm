@@ -14,7 +14,12 @@ export type SectionKey =
   | "other_contacts"
   | "trustees"
   | "research_evidence"
-  | "city_group";
+  | "city_group"
+  | "division_opportunity"
+  | "approval_requirements"
+  | "graduation_venue"
+  | "opportunity_status"
+  | "approvals";
 
 export type CollapseState = Record<string, boolean>;
 
@@ -26,7 +31,12 @@ const DEFAULTS: Record<SectionKey, boolean> = {
   other_contacts: true,
   trustees: true,
   research_evidence: true,
-  city_group: true
+  city_group: true,
+  division_opportunity: false,
+  approval_requirements: true,
+  graduation_venue: false,
+  opportunity_status: false,
+  approvals: true
 };
 
 /**

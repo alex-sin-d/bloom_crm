@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       activities: {
@@ -46,6 +21,7 @@ export type Database = {
           contact_role_id: string | null
           created_at: string
           created_by: string | null
+          direction: Database["public"]["Enums"]["activity_direction"] | null
           follow_up_date: string | null
           id: string
           next_action: string | null
@@ -56,7 +32,6 @@ export type Database = {
           summary: string | null
           updated_at: string
           updated_by: string | null
-          direction: Database["public"]["Enums"]["activity_direction"] | null
           user_id: string
           visibility: Database["public"]["Enums"]["activity_visibility"]
         }
@@ -488,6 +463,7 @@ export type Database = {
       }
       data_review_items: {
         Row: {
+          assigned_owner_id: string | null
           created_at: string
           current_value: string | null
           decision_notes: string | null
@@ -503,6 +479,9 @@ export type Database = {
           record_type_id: string | null
           resolved_at: string | null
           resolved_by: string | null
+          review_decision:
+            | Database["public"]["Enums"]["data_review_decision_type"]
+            | null
           review_status: Database["public"]["Enums"]["data_review_status"]
           severity: Database["public"]["Enums"]["review_severity"]
           source_row_id: string | null
@@ -510,6 +489,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_owner_id?: string | null
           created_at?: string
           current_value?: string | null
           decision_notes?: string | null
@@ -525,6 +505,9 @@ export type Database = {
           record_type_id?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          review_decision?:
+            | Database["public"]["Enums"]["data_review_decision_type"]
+            | null
           review_status?: Database["public"]["Enums"]["data_review_status"]
           severity?: Database["public"]["Enums"]["review_severity"]
           source_row_id?: string | null
@@ -532,6 +515,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_owner_id?: string | null
           created_at?: string
           current_value?: string | null
           decision_notes?: string | null
@@ -547,6 +531,9 @@ export type Database = {
           record_type_id?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          review_decision?:
+            | Database["public"]["Enums"]["data_review_decision_type"]
+            | null
           review_status?: Database["public"]["Enums"]["data_review_status"]
           severity?: Database["public"]["Enums"]["review_severity"]
           source_row_id?: string | null
@@ -554,6 +541,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "data_review_items_assigned_owner_id_fkey"
+            columns: ["assigned_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "data_review_items_duplicate_candidate_id_fkey"
             columns: ["duplicate_candidate_id"]
@@ -1519,6 +1513,97 @@ export type Database = {
           },
         ]
       }
+      organization_outreach: {
+        Row: {
+          backup_contact_role_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+          outreach_route: Database["public"]["Enums"]["outreach_route"]
+          outreach_status: Database["public"]["Enums"]["outreach_status"]
+          primary_contact_role_id: string | null
+          status_changed_at: string | null
+          status_changed_by: string | null
+          status_note: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          backup_contact_role_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+          outreach_route?: Database["public"]["Enums"]["outreach_route"]
+          outreach_status?: Database["public"]["Enums"]["outreach_status"]
+          primary_contact_role_id?: string | null
+          status_changed_at?: string | null
+          status_changed_by?: string | null
+          status_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          backup_contact_role_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+          outreach_route?: Database["public"]["Enums"]["outreach_route"]
+          outreach_status?: Database["public"]["Enums"]["outreach_status"]
+          primary_contact_role_id?: string | null
+          status_changed_at?: string | null
+          status_changed_by?: string | null
+          status_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_outreach_backup_contact_role_id_fkey"
+            columns: ["backup_contact_role_id"]
+            isOneToOne: false
+            referencedRelation: "contact_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_primary_contact_role_id_fkey"
+            columns: ["primary_contact_role_id"]
+            isOneToOne: false
+            referencedRelation: "contact_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_status_changed_by_fkey"
+            columns: ["status_changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_outreach_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           archive_reason: string | null
@@ -1613,97 +1698,6 @@ export type Database = {
           },
           {
             foreignKeyName: "organizations_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      organization_outreach: {
-        Row: {
-          backup_contact_role_id: string | null
-          created_at: string
-          created_by: string | null
-          id: string
-          organization_id: string
-          outreach_route: Database["public"]["Enums"]["outreach_route"]
-          outreach_status: Database["public"]["Enums"]["outreach_status"]
-          primary_contact_role_id: string | null
-          status_changed_at: string | null
-          status_changed_by: string | null
-          status_note: string | null
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          backup_contact_role_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          organization_id: string
-          outreach_route?: Database["public"]["Enums"]["outreach_route"]
-          outreach_status?: Database["public"]["Enums"]["outreach_status"]
-          primary_contact_role_id?: string | null
-          status_changed_at?: string | null
-          status_changed_by?: string | null
-          status_note?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          backup_contact_role_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          organization_id?: string
-          outreach_route?: Database["public"]["Enums"]["outreach_route"]
-          outreach_status?: Database["public"]["Enums"]["outreach_status"]
-          primary_contact_role_id?: string | null
-          status_changed_at?: string | null
-          status_changed_by?: string | null
-          status_note?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organization_outreach_backup_contact_role_id_fkey"
-            columns: ["backup_contact_role_id"]
-            isOneToOne: false
-            referencedRelation: "contact_roles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_outreach_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_outreach_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_outreach_primary_contact_role_id_fkey"
-            columns: ["primary_contact_role_id"]
-            isOneToOne: false
-            referencedRelation: "contact_roles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_outreach_status_changed_by_fkey"
-            columns: ["status_changed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_outreach_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -3031,6 +3025,18 @@ export type Database = {
         | "senior_escalation"
         | "unknown"
       contact_role_status: "current" | "historical" | "unverified" | "archived"
+      data_review_decision_type:
+        | "keep_current"
+        | "use_imported"
+        | "manual_edit"
+        | "linked_existing_record"
+        | "created_new_record"
+        | "not_an_issue"
+        | "needs_more_information"
+        | "confirmed_duplicate"
+        | "different_records"
+        | "marked_unavailable"
+        | "not_needed"
       data_review_issue_type:
         | "field_conflict"
         | "duplicate_warning"
@@ -3443,9 +3449,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       activity_direction: ["inbound", "outbound"],
@@ -3556,6 +3559,19 @@ export const Constants = {
         "unknown",
       ],
       contact_role_status: ["current", "historical", "unverified", "archived"],
+      data_review_decision_type: [
+        "keep_current",
+        "use_imported",
+        "manual_edit",
+        "linked_existing_record",
+        "created_new_record",
+        "not_an_issue",
+        "needs_more_information",
+        "confirmed_duplicate",
+        "different_records",
+        "marked_unavailable",
+        "not_needed",
+      ],
       data_review_issue_type: [
         "field_conflict",
         "duplicate_warning",
@@ -3721,6 +3737,14 @@ export const Constants = {
         "government_education_authority",
         "other",
       ],
+      outreach_path: [
+        "school_first",
+        "division_first",
+        "venue_first",
+        "relationship_first",
+        "mixed",
+        "unknown",
+      ],
       outreach_route: [
         "not_decided",
         "division_first",
@@ -3735,14 +3759,6 @@ export const Constants = {
         "spoke_by_phone",
         "call_back_requested",
         "not_pursuing",
-      ],
-      outreach_path: [
-        "school_first",
-        "division_first",
-        "venue_first",
-        "relationship_first",
-        "mixed",
-        "unknown",
       ],
       permission_level: ["owner"],
       pipeline_stage: [

@@ -2,8 +2,9 @@ import { PageHeader } from "@/components/crm/page-header";
 import {
   ActivityList,
   ApprovalList,
-  ContactList,
+  DataReviewList,
   DetailSection,
+  EvidenceList,
   InfoLine,
   OpportunitySummaryList,
   OrganizationBasics,
@@ -13,14 +14,14 @@ import {
 import {
   CityGroupedSchools,
   CollapsibleSection,
-  ContactGroups,
-  ContactsAndOutreachSummary
+  DivisionContactsAndOutreach
 } from "@/components/crm/outreach-contacts";
 import { requireAuthorizedSession } from "@/lib/auth/session";
 import {
   getSchoolDivisionDetail,
   parseSchoolOutreachSearch
 } from "@/lib/crm/school-outreach-queries";
+import { getOutreachRouteLabel, getOutreachStatusLabel } from "@/lib/crm/outreach-labels";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -48,6 +49,18 @@ export default async function SchoolDivisionPage({
     label: [c.label, c.roleTitle].filter(Boolean).join(" — ")
   }));
 
+  const opportunityId = detail.opportunities[0]?.id ?? null;
+
+  const outreachStatusLabel = getOutreachStatusLabel(
+    detail.outreachSummary.outreachRow?.outreach_status ?? null
+  );
+  const outreachRouteLabel = getOutreachRouteLabel(
+    detail.outreachSummary.outreachRow?.outreach_route ?? null
+  );
+
+  const workspacePath = `/school-outreach/divisions/${divisionId}`;
+  const showActivatedBanner = (rawSearchParams as Record<string, string | undefined>).activated === "1";
+
   return (
     <section className="mx-auto max-w-7xl space-y-5">
       <PageHeader
@@ -64,7 +77,13 @@ export default async function SchoolDivisionPage({
         subtitle={`${detail.totals.associatedSchools} linked schools · ${detail.totals.notContactedSchools} not contacted · ${detail.totals.activeOpportunities} active opportunities`}
       />
 
-      {/* Compact header: org basics + key counts */}
+      {showActivatedBanner ? (
+        <div className="rounded-card border border-green-300 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+          Added to Active Opportunities. Contact and outreach tools are now available.
+        </div>
+      ) : null}
+
+      {/* Compact division identity header */}
       <section className="rounded-card border border-border bg-surface p-4 shadow-soft">
         <OrganizationBasics organization={detail.division} />
         <dl className="mt-4 grid gap-4 md:grid-cols-3">
@@ -74,24 +93,24 @@ export default async function SchoolDivisionPage({
         </dl>
       </section>
 
-      {/* 1. Contacts and outreach — first major section */}
+      {/* 1. Contacts and outreach */}
       <CollapsibleSection
         preferences={detail.collapsePreferences}
         sectionKey="contacts_and_outreach"
         title="Contacts and outreach"
-        summary={`Status: ${detail.outreachSummary.outreachRow?.outreach_status?.replace(/_/g, " ") ?? "not contacted"} · Route: ${detail.outreachSummary.outreachRow?.outreach_route?.replace(/_/g, " ") ?? "not decided"}`}
+        summary={`${detail.contacts.length} known contacts · ${outreachStatusLabel} · ${outreachRouteLabel}`}
       >
-        <div className="space-y-5">
-          <ContactsAndOutreachSummary
-            organizationId={detail.division.id}
-            outreachSummary={detail.outreachSummary}
-            contactRoleOptions={contactRoleOptions}
-          />
-          <ContactGroups
-            groups={detail.contactGroups}
-            preferences={detail.collapsePreferences}
-          />
-        </div>
+        <DivisionContactsAndOutreach
+          activatableOpportunityId={detail.activatableOpportunityId}
+          contactGroups={detail.contactGroups}
+          contactRoleOptions={contactRoleOptions}
+          isActive={detail.isActive}
+          opportunityId={opportunityId}
+          organizationId={detail.division.id}
+          outreachSummary={detail.outreachSummary}
+          preferences={detail.collapsePreferences}
+          workspacePath={workspacePath}
+        />
       </CollapsibleSection>
 
       {/* 2. Associated high schools */}
@@ -118,7 +137,7 @@ export default async function SchoolDivisionPage({
       {/* 3. Division opportunity */}
       <CollapsibleSection
         preferences={detail.collapsePreferences}
-        sectionKey="contacts_and_outreach"
+        sectionKey="division_opportunity"
         title="Division opportunity"
         summary={`${detail.opportunities.length} opportunity record${detail.opportunities.length !== 1 ? "s" : ""}`}
       >
@@ -129,27 +148,42 @@ export default async function SchoolDivisionPage({
       <CollapsibleSection
         defaultCollapsed
         preferences={detail.collapsePreferences}
-        sectionKey="contacts_and_outreach"
+        sectionKey="approval_requirements"
         title="Approval requirements"
         summary={`${detail.approvals.length} item${detail.approvals.length !== 1 ? "s" : ""}`}
       >
         <ApprovalList approvals={detail.approvals} />
       </CollapsibleSection>
 
-      {/* Sidebar-style supplemental info */}
+      {/* 5. Tasks and activity */}
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-5">
-          <DetailSection title="Research evidence and data issues">
-            <ContactList contacts={[]} />
-          </DetailSection>
-        </div>
+        <DetailSection title="Tasks and activity">
+          <div className="space-y-4">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-text-heading">Open tasks</h3>
+              <TaskList tasks={detail.tasks} />
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-text-heading">Recent activity</h3>
+              <ActivityList activities={detail.activities} />
+            </div>
+          </div>
+        </DetailSection>
+
+        {/* 6. Research evidence and data issues */}
         <aside className="space-y-5">
-          <DetailSection title="Recent activity">
-            <ActivityList activities={detail.activities} />
-          </DetailSection>
-          <DetailSection title="Open tasks">
-            <TaskList tasks={detail.tasks} />
-          </DetailSection>
+          <CollapsibleSection
+            defaultCollapsed
+            preferences={detail.collapsePreferences}
+            sectionKey="research_evidence"
+            title="Research evidence and data issues"
+            summary={`${detail.evidence.length} source${detail.evidence.length !== 1 ? "s" : ""} · ${detail.dataReviewItems.length} issue${detail.dataReviewItems.length !== 1 ? "s" : ""}`}
+          >
+            <div className="space-y-4">
+              <EvidenceList evidence={detail.evidence} />
+              <DataReviewList items={detail.dataReviewItems} />
+            </div>
+          </CollapsibleSection>
         </aside>
       </div>
     </section>

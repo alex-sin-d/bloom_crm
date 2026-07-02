@@ -12,6 +12,8 @@ import {
   formatResearchStatusLabel
 } from "@/lib/crm/format";
 import { getOpportunityDetail } from "@/lib/crm/opportunity-queries";
+import { getOpportunityWorkspaceHref } from "@/lib/crm/outreach-labels";
+import { getOutreachSnapshot } from "@/lib/crm/school-outreach-queries";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -32,27 +34,107 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
 
   const opportunity = detail.opportunity;
 
+  const workspaceHref = getOpportunityWorkspaceHref(
+    opportunity.opportunityType,
+    opportunity.organization?.id ?? null
+  );
+  const isActiveSchoolOrDivision =
+    workspaceHref !== null &&
+    opportunity.researchStatus === "added_to_pipeline" &&
+    opportunity.pipelineStage !== "research_only";
+  const outreachSnapshot = isActiveSchoolOrDivision && opportunity.organization?.id
+    ? await getOutreachSnapshot(opportunity.organization.id)
+    : null;
+
   return (
     <section className="mx-auto max-w-7xl">
       <PageHeader
         actions={
-          <Link
-            className="rounded-control border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-body"
-            href={
-              opportunity.researchStatus === "added_to_pipeline"
-                ? "/pipeline"
-                : `/research/opportunities?preview=${opportunity.id}`
-            }
-          >
-            {opportunity.researchStatus === "added_to_pipeline"
-              ? "Back to active opportunities"
-              : "Back to research"}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {workspaceHref ? (
+              <Link
+                className="rounded-control border border-brand-forest bg-brand-forest px-4 py-2 text-sm font-semibold text-white"
+                href={workspaceHref}
+              >
+                Open {opportunity.opportunityType === "division" ? "division" : "school"} workspace
+              </Link>
+            ) : null}
+            <Link
+              className="rounded-control border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-body"
+              href={
+                opportunity.researchStatus === "added_to_pipeline"
+                  ? "/pipeline"
+                  : `/research/opportunities?preview=${opportunity.id}`
+              }
+            >
+              {opportunity.researchStatus === "added_to_pipeline"
+                ? "Back to active opportunities"
+                : "Back to research"}
+            </Link>
+          </div>
         }
         eyebrow="Opportunity"
         title={opportunity.opportunityName}
-        subtitle="Use this read-only view to understand the opportunity and plan outreach. Editing, stage movement, follow-ups, and approval updates are coming soon."
+        subtitle={
+          isActiveSchoolOrDivision
+            ? undefined
+            : "Use this read-only view to understand the opportunity and plan outreach. Editing, stage movement, follow-ups, and approval updates are coming soon."
+        }
       />
+
+      {isActiveSchoolOrDivision ? (
+        <div className="mb-5 rounded-card border border-brand-forest/20 bg-green-50 p-4 shadow-soft">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-green-700">Active school outreach workspace</p>
+              <p className="mt-1 text-base font-semibold text-text-heading">
+                {opportunity.organization?.name ?? "Organization"}
+              </p>
+            </div>
+            {workspaceHref ? (
+              <Link
+                className="shrink-0 rounded-control border border-brand-forest bg-brand-forest px-4 py-2 text-sm font-semibold text-white"
+                href={workspaceHref}
+              >
+                Open {opportunity.opportunityType === "division" ? "division" : "school"} workspace
+              </Link>
+            ) : null}
+          </div>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-text-muted">Outreach status</dt>
+              <dd className="mt-1 text-sm text-text-body">
+                {outreachSnapshot?.outreachStatus
+                  ? outreachSnapshot.outreachStatus.replace(/_/g, " ")
+                  : "Not contacted"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-text-muted">Primary contact</dt>
+              <dd className="mt-1 text-sm text-text-body">
+                {outreachSnapshot?.primaryContactLabel ?? "Not selected"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-text-muted">Next follow-up</dt>
+              <dd className="mt-1 text-sm text-text-body">
+                {outreachSnapshot?.nextFollowUp?.due_date
+                  ? formatDate(outreachSnapshot.nextFollowUp.due_date)
+                  : "None scheduled"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-text-muted">Pipeline stage</dt>
+              <dd className="mt-1 text-sm text-text-body">
+                {formatPipelineStageLabel(opportunity.pipelineStage)}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-green-700">
+            Contact management, outreach logging, and follow-up tools are in the workspace above. This page is a read-only overview.
+          </p>
+        </div>
+      ) : null}
 
       <div className="mb-5 rounded-card border border-border bg-surface p-4 shadow-soft">
         <div className="flex flex-wrap gap-2">

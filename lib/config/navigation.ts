@@ -16,14 +16,14 @@ export const navigationGroups: NavigationGroup[] = [
       { href: "/dashboard", label: "Dashboard" },
       { href: "/school-outreach", label: "School Outreach" },
       { href: "/research/opportunities", label: "Opportunities to Review" },
-      { href: "/pipeline", label: "Active Opportunities" }
+      { href: "/pipeline", label: "Active Opportunities" },
+      { href: "/tasks", label: "Tasks" },
+      { href: "/data-review", label: "Data Issues to Review" }
     ]
   },
   {
     label: "Coming soon",
     items: [
-      { label: "Data Issues to Review", status: "coming-soon" },
-      { label: "Tasks", status: "coming-soon" },
       { label: "Organizations", status: "coming-soon" },
       { label: "Contacts", status: "coming-soon" },
       { label: "Events", status: "coming-soon" },

@@ -1,11 +1,22 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { failOnError, uniqueValues } from "@/lib/crm/query-utils";
 import { enrichOpportunityRows, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
+import { getDashboardTaskSnapshot, type DashboardTaskSnapshot } from "@/lib/crm/task-queries";
+import {
+  getDashboardDataReviewSnapshot,
+  type DashboardDataReviewSnapshot
+} from "@/lib/crm/data-review-queries";
+import { getLocalTodayString } from "@/lib/crm/task-logic";
 import type { ActivityRow, OpportunityListItem } from "@/lib/crm/types";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 export type DashboardSummary = {
   activePipelineCount: number;
+  dataReviewAssignedToMeCount: number;
+  dataReviewNextItems: DashboardDataReviewSnapshot["nextItems"];
+  dataReviewUnassignedCount: number;
+  dueTodayTaskCount: number;
+  nextTasks: DashboardTaskSnapshot["nextTasks"];
   openTaskCount: number;
   overdueTaskCount: number;
   recentActivities: ActivityRow[];
@@ -44,39 +55,6 @@ async function countActivePipeline(supabase: ServerSupabaseClient) {
     .neq("pipeline_stage", "research_only");
 
   failOnError(error, "Could not count active pipeline opportunities.");
-  return count ?? 0;
-}
-
-async function countOpenTasks(supabase: ServerSupabaseClient) {
-  const { count, error } = await supabase
-    .from("tasks")
-    .select("id", { count: "exact", head: true })
-    .is("archived_at", null)
-    .not("status", "in", "(completed,cancelled)");
-
-  failOnError(error, "Could not count open tasks.");
-  return count ?? 0;
-}
-
-async function countOverdueTasks(supabase: ServerSupabaseClient, today: string) {
-  const { count, error } = await supabase
-    .from("tasks")
-    .select("id", { count: "exact", head: true })
-    .is("archived_at", null)
-    .not("status", "in", "(completed,cancelled)")
-    .lt("due_date", today);
-
-  failOnError(error, "Could not count overdue tasks.");
-  return count ?? 0;
-}
-
-async function countUnresolvedReview(supabase: ServerSupabaseClient) {
-  const { count, error } = await supabase
-    .from("data_review_items")
-    .select("id", { count: "exact", head: true })
-    .eq("review_status", "open");
-
-  failOnError(error, "Could not count Data Review items.");
   return count ?? 0;
 }
 
@@ -149,10 +127,15 @@ async function getTierOneResearch(supabase: ServerSupabaseClient) {
   return enrichOpportunityRows(supabase, data ?? []);
 }
 
-export async function getDashboardSummary(): Promise<DashboardSummary> {
+export async function getDashboardSummary(currentProfileId: string): Promise<DashboardSummary> {
   if (!hasSupabaseEnv()) {
     return {
       activePipelineCount: 0,
+      dataReviewAssignedToMeCount: 0,
+      dataReviewNextItems: [],
+      dataReviewUnassignedCount: 0,
+      dueTodayTaskCount: 0,
+      nextTasks: [],
       openTaskCount: 0,
       overdueTaskCount: 0,
       recentActivities: [],
@@ -165,14 +148,13 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   }
 
   const supabase = await createServerSupabaseClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalTodayString();
 
   const [
     researchAwaitingReviewCount,
     activePipelineCount,
-    openTaskCount,
-    overdueTaskCount,
-    unresolvedReviewCount,
+    taskSnapshot,
+    dataReviewSnapshot,
     waitingApprovalCount,
     recentActivities,
     recentImports,
@@ -180,9 +162,8 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   ] = await Promise.all([
     countResearch(supabase),
     countActivePipeline(supabase),
-    countOpenTasks(supabase),
-    countOverdueTasks(supabase, today),
-    countUnresolvedReview(supabase),
+    getDashboardTaskSnapshot(supabase, currentProfileId, today),
+    getDashboardDataReviewSnapshot(supabase, currentProfileId),
     countWaitingApproval(supabase),
     getRecentActivities(supabase),
     getRecentImports(supabase),
@@ -191,13 +172,18 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
 
   return {
     activePipelineCount,
-    openTaskCount,
-    overdueTaskCount,
+    dataReviewAssignedToMeCount: dataReviewSnapshot.assignedToMeCount,
+    dataReviewNextItems: dataReviewSnapshot.nextItems,
+    dataReviewUnassignedCount: dataReviewSnapshot.unassignedCount,
+    dueTodayTaskCount: taskSnapshot.dueTodayTaskCount,
+    nextTasks: taskSnapshot.nextTasks,
+    openTaskCount: taskSnapshot.openTaskCount,
+    overdueTaskCount: taskSnapshot.overdueTaskCount,
     recentActivities,
     recentImports,
     researchAwaitingReviewCount,
     tierOneResearch,
-    unresolvedReviewCount,
+    unresolvedReviewCount: dataReviewSnapshot.openIssueCount,
     waitingApprovalCount
   };
 }

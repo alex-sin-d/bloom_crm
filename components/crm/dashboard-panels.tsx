@@ -1,6 +1,6 @@
 import { StatusBadge } from "@/components/crm/status-badge";
 import { GettingStartedCard } from "@/components/crm/getting-started-card";
-import { formatDateTime, formatEnumLabel } from "@/lib/crm/format";
+import { formatDate, formatDateTime, formatEnumLabel } from "@/lib/crm/format";
 import type { DashboardSummary } from "@/lib/crm/dashboard-queries";
 import Link from "next/link";
 
@@ -104,16 +104,82 @@ export function DashboardPanels({ summary }: { summary: DashboardSummary }) {
           value={summary.activePipelineCount}
         />
         <MetricCard
+          href="/data-review"
           label="Data issues to review"
-          description="Imported data questions that still need a human look. The review screen is not built yet."
+          description="Imported data questions that still need a human look."
+          actionLabel="Review data issues"
+          secondary={`${summary.dataReviewAssignedToMeCount} assigned to you · ${summary.dataReviewUnassignedCount} unassigned`}
           value={summary.unresolvedReviewCount}
         />
         <MetricCard
-          label="Tasks in the data"
-          description="Task list screens are coming soon, so this count is only a data signal today."
-          secondary={`${summary.overdueTaskCount} overdue`}
+          href="/tasks"
+          label="Open tasks"
+          description="Follow-ups and other work waiting for Alex and Sam."
+          actionLabel="Open tasks"
+          secondary={`${summary.dueTodayTaskCount} due today · ${summary.overdueTaskCount} overdue`}
           value={summary.openTaskCount}
         />
+      </section>
+
+      <section className="rounded-card border border-border bg-surface shadow-soft">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-base font-semibold text-text-heading">Your next tasks</h2>
+        </div>
+        {summary.nextTasks.length > 0 ? (
+          <div className="divide-y divide-border">
+            {summary.nextTasks.map((task) => (
+              <div className="grid gap-3 px-4 py-3 md:grid-cols-[1fr_auto] md:items-center" key={task.id}>
+                <div className="min-w-0">
+                  <p className="font-medium text-text-heading">{task.title}</p>
+                  <p className="mt-1 text-sm text-text-muted">
+                    {task.organization?.name ?? "General task"} ·{" "}
+                    {task.dueDate ? formatDate(task.dueDate) : "No due date"}
+                  </p>
+                </div>
+                {task.workspaceHref ? (
+                  <Link
+                    className="text-sm font-semibold text-brand-forest"
+                    href={task.workspaceHref}
+                  >
+                    {task.workspaceLabel ?? "Open related workspace"}
+                  </Link>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="px-4 py-6 text-sm text-text-muted">No tasks assigned to you.</p>
+        )}
+      </section>
+
+      <section className="rounded-card border border-border bg-surface shadow-soft">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-base font-semibold text-text-heading">
+            Data issues needing attention
+          </h2>
+        </div>
+        {summary.dataReviewNextItems.length > 0 ? (
+          <div className="divide-y divide-border">
+            {summary.dataReviewNextItems.map((item) => (
+              <div className="grid gap-3 px-4 py-3 md:grid-cols-[1fr_auto] md:items-center" key={item.id}>
+                <div className="min-w-0">
+                  <p className="font-medium text-text-heading">{item.title}</p>
+                  <p className="mt-1 text-sm text-text-muted">
+                    {item.record?.name ?? "Imported information"} · {item.assignmentLabel}
+                  </p>
+                </div>
+                <Link
+                  className="text-sm font-semibold text-brand-forest"
+                  href={`/data-review?review=${item.id}`}
+                >
+                  Review
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="px-4 py-6 text-sm text-text-muted">No data issues need attention.</p>
+        )}
       </section>
 
       <section className="rounded-card border border-border bg-surface p-4 shadow-soft">

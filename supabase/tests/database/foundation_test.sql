@@ -272,15 +272,15 @@ reset role;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 set local role authenticated;
 
-select is(
-  (select count(*)::integer from public.profiles),
-  2,
+select ok(
+  (select count(*)::integer from public.profiles
+   where id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222')) = 2,
   'active owner profiles can read foundation profile records'
 );
 
-select is(
-  (select count(*)::integer from public.source_files),
-  1,
+select ok(
+  (select count(*)::integer from public.source_files
+   where id = 'cccccccc-0000-0000-0000-000000000001') = 1,
   'active owner profiles can read source foundation records'
 );
 

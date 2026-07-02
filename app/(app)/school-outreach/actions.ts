@@ -1,7 +1,7 @@
 "use server";
 
 import { getProtectedSession } from "@/lib/auth/session";
-import { deriveNextReminderAfterCompletion, deriveOutreachRuleResult } from "@/lib/crm/outreach-rules";
+import { deriveOutreachRuleResult } from "@/lib/crm/outreach-rules";
 import { mergeCollapseState } from "@/lib/crm/collapse-preferences";
 import {
   findContactMethodDuplicate,
@@ -10,6 +10,7 @@ import {
   normalizeContactValue
 } from "@/lib/crm/contact-duplicates";
 import { getRecordTypeId } from "@/lib/crm/shared-queries";
+import { completeTaskById } from "@/lib/crm/task-mutations";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -615,71 +616,7 @@ export type CompleteReminderResult =
 export async function completeReminderTaskAction(
   taskId: string
 ): Promise<CompleteReminderResult> {
-  const profile = await requireActiveOwner();
-  const supabase = await createServerSupabaseClient();
-  const now = new Date().toISOString();
-
-  const { data: task, error: taskError } = await supabase
-    .from("tasks")
-    .select(
-      "id,status,task_kind,related_activity_id,organization_id,opportunity_id,contact_role_id,due_date"
-    )
-    .eq("id", taskId)
-    .maybeSingle();
-
-  if (taskError || !task) {
-    return { error: taskError?.message ?? "Task not found." };
-  }
-
-  if (task.status === "completed" || task.status === "cancelled") {
-    return { error: "Task is already completed or cancelled." };
-  }
-
-  const { error: completeError } = await supabase
-    .from("tasks")
-    .update({
-      status: "completed",
-      completed_at: now,
-      completed_by: profile.id
-    })
-    .eq("id", taskId);
-
-  if (completeError) return { error: completeError.message };
-
-  if (task.related_activity_id && task.task_kind === "follow_up") {
-    const { count } = await supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("related_activity_id", task.related_activity_id)
-      .eq("task_kind", "follow_up")
-      .neq("id", taskId);
-
-    const completedStep = 1 + (count ?? 0);
-    const nextReminder = deriveNextReminderAfterCompletion(completedStep, new Date(now));
-
-    if (nextReminder) {
-      await supabase.from("tasks").insert({
-        title: nextReminder.title,
-        task_kind: "follow_up",
-        status: "open",
-        priority: "medium",
-        assigned_user_id: profile.id,
-        created_by: profile.id,
-        organization_id: task.organization_id,
-        opportunity_id: task.opportunity_id,
-        contact_role_id: task.contact_role_id,
-        due_date: nextReminder.dueDateString,
-        related_activity_id: task.related_activity_id
-      });
-    }
-  }
-
-  if (task.organization_id) {
-    revalidateOutreachPaths(task.organization_id);
-  }
-  revalidatePath("/tasks");
-
-  return { success: true };
+  return completeTaskById(taskId);
 }
 
 // ── Save collapse state ────────────────────────────────────────────────────────

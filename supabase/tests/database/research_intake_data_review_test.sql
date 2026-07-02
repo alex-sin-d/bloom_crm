@@ -1171,6 +1171,7 @@ select lives_ok(
     set review_status = 'resolved',
       resolved_by = '11111111-2222-0000-0000-000000000001',
       resolved_at = now(),
+      review_decision = 'keep_current',
       decision_notes = 'Accepted manual value'
     where id = '19191919-2000-0000-0000-000000000001'
   $$,
@@ -1444,6 +1445,7 @@ select lives_ok(
     set review_status = 'ignored',
       resolved_by = '11111111-2222-0000-0000-000000000001',
       resolved_at = now(),
+      review_decision = 'not_an_issue',
       decision_notes = 'Known import issue, no action needed'
     where id = '19191919-2000-0000-0000-000000000004'
   $$,

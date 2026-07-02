@@ -21,7 +21,9 @@ import type {
   TaskRow,
   VenueRow
 } from "@/lib/crm/types";
-import type { Json } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/supabase/database.types";
+
+type SchoolManualStatus = Database["public"]["Enums"]["outreach_status"] | null;
 
 export const SCHOOL_OUTREACH_FILTERS = [
   "all",
@@ -71,6 +73,8 @@ export type SchoolRowSummary = {
   event: EventRow | null;
   graduationOpportunity: OpportunityListItem | null;
   id: string;
+  lastContactAt: string | null;
+  manualStatus: SchoolManualStatus;
   name: string;
   nextAction: string | null;
   outreachStatus: OutreachStatus;
@@ -159,12 +163,16 @@ export type SchoolOutreachOverview = {
 
 export type DivisionDetail = {
   activities: ActivityRow[];
+  activatableOpportunityId: string | null;
   approvals: OpportunityApprovalItemRow[];
   collapsePreferences: Json | null;
   contactGroups: ContactGroup[];
   contacts: ContactSummary[];
+  dataReviewItems: DataReviewItemRow[];
   division: OrganizationRow;
+  evidence: EvidenceSummary[];
   filters: Pick<SchoolOutreachSearch, "q">;
+  isActive: boolean;
   opportunities: OpportunityListItem[];
   outreachSummary: OutreachSummary;
   schoolGroups: SchoolCityGroup[];
@@ -178,6 +186,7 @@ export type DivisionDetail = {
 
 export type SchoolDetail = {
   activities: ActivityRow[];
+  activatableOpportunityId: string | null;
   approvals: OpportunityApprovalItemRow[];
   collapsePreferences: Json | null;
   contacts: ContactSummary[];
@@ -186,12 +195,23 @@ export type SchoolDetail = {
   division: OrganizationRow | null;
   events: EventRow[];
   evidence: EvidenceSummary[];
+  isActive: boolean;
   opportunities: OpportunityListItem[];
   outreachSummary: OutreachSummary;
   school: OrganizationRow;
   tasks: TaskRow[];
   venuesById: Map<string, VenueRow>;
   venueOrganizationsById: Map<string, OrganizationRow>;
+};
+
+/**
+ * Lightweight snapshot of a school/division's outreach state for the
+ * generic opportunity page banner (no full contact list needed).
+ */
+export type OutreachSnapshot = {
+  nextFollowUp: TaskRow | null;
+  outreachStatus: Database["public"]["Enums"]["outreach_status"] | null;
+  primaryContactLabel: string | null;
 };
 
 type OutreachData = {
@@ -558,18 +578,28 @@ function getEventsForSchool(data: OutreachData, schoolId: string) {
     });
 }
 
+const CONTACT_ACTIVITY_TYPES = new Set([
+  "email_sent",
+  "email_received",
+  "call_attempted",
+  "call_completed",
+  "voicemail_left"
+]);
+
 function getSchoolRowSummary({
   contactsByOrganizationId,
   contactsByOpportunityId,
   data,
   divisionId,
-  school
+  school,
+  schoolOutreachMap
 }: {
   contactsByOrganizationId: Map<string, ContactSummary[]>;
   contactsByOpportunityId: Map<string, ContactSummary[]>;
   data: OutreachData;
   divisionId: string;
   school: OrganizationRow;
+  schoolOutreachMap: Map<string, SchoolManualStatus>;
 }): SchoolRowSummary {
   const opportunityRows = getOpportunityRowsForOrganization(data, school.id);
   const opportunities = getOpportunitiesForOrganization(data, school.id);
@@ -597,6 +627,11 @@ function getSchoolRowSummary({
     .find(Boolean);
   const contact = opportunityContact ?? (contactsByOrganizationId.get(school.id) ?? [])[0] ?? null;
 
+  const lastContactAt =
+    activities
+      .filter((a) => CONTACT_ACTIVITY_TYPES.has(a.activity_type))
+      .sort((a, b) => b.activity_at.localeCompare(a.activity_at))[0]?.activity_at ?? null;
+
   return {
     city: school.city ?? "City unknown",
     contact,
@@ -604,6 +639,8 @@ function getSchoolRowSummary({
     event,
     graduationOpportunity,
     id: school.id,
+    lastContactAt,
+    manualStatus: schoolOutreachMap.get(school.id) ?? null,
     name: school.name,
     nextAction: graduationOpportunity?.nextAction ?? null,
     outreachStatus: deriveOutreachStatus({ activities, opportunities, tasks }),
@@ -1104,6 +1141,23 @@ async function loadDataReviewItems(
   return items;
 }
 
+/**
+ * Returns isActive=true when at least one opportunity for the org has been
+ * added to the pipeline (researchStatus=added_to_pipeline AND pipelineStage≠research_only).
+ * Also returns the id of the first opportunity that is still activatable (pipeline_stage=research_only).
+ */
+function deriveActivationState(opportunities: OpportunityListItem[]): {
+  isActive: boolean;
+  activatableOpportunityId: string | null;
+} {
+  const isActive = opportunities.some(
+    (op) =>
+      op.researchStatus === "added_to_pipeline" && op.pipelineStage !== "research_only"
+  );
+  const activatable = opportunities.find((op) => op.pipelineStage === "research_only");
+  return { isActive, activatableOpportunityId: activatable?.id ?? null };
+}
+
 export async function getSchoolOutreachOverview(
   filters: SchoolOutreachSearch
 ): Promise<SchoolOutreachOverview> {
@@ -1290,19 +1344,37 @@ export async function getSchoolDivisionDetail(
     organizationIds: [divisionId, ...allSchoolIds]
   });
   const { byOpportunityId, byOrganizationId } = contactMaps(contacts);
+
+  const divisionOpportunityIds = divisionOpportunityRows.map((opportunity) => opportunity.id);
+  const relatedOpportunityIds = [...divisionOpportunityRows, ...schoolOpportunityRows].map(
+    (opportunity) => opportunity.id
+  );
+
+  // Load per-school manual outreach status
+  const schoolOutreachResult = allSchoolIds.length
+    ? await supabase
+        .from("organization_outreach")
+        .select("organization_id, outreach_status")
+        .in("organization_id", allSchoolIds)
+    : { data: [], error: null };
+
+  failOnError(schoolOutreachResult.error, "Could not load school outreach statuses.");
+
+  const schoolOutreachMap = new Map<string, SchoolManualStatus>(
+    (schoolOutreachResult.data ?? []).map((r) => [r.organization_id, r.outreach_status])
+  );
+
   const schoolRows = schools.map((school) =>
     getSchoolRowSummary({
       contactsByOpportunityId: byOpportunityId,
       contactsByOrganizationId: byOrganizationId,
       data,
       divisionId,
-      school
+      school,
+      schoolOutreachMap
     })
   );
-  const divisionOpportunityIds = divisionOpportunityRows.map((opportunity) => opportunity.id);
-  const relatedOpportunityIds = [...divisionOpportunityRows, ...schoolOpportunityRows].map(
-    (opportunity) => opportunity.id
-  );
+
   const allActivitiesForDiv = getActivitiesFor({
     activities: data.activities,
     opportunityIds: relatedOpportunityIds,
@@ -1313,7 +1385,6 @@ export async function getSchoolDivisionDetail(
     getTasksFor({ organizationId: divisionId, opportunityIds: relatedOpportunityIds, tasks: data.tasks })
   );
   const tasks = allTasksForDiv.slice(0, 10);
-  const approvals = await loadApprovals(supabase, approvalIdsFor(divisionOpportunities));
 
   const divisionContacts = contacts.filter(
     (contact) =>
@@ -1321,19 +1392,35 @@ export async function getSchoolDivisionDetail(
       (contact.opportunityId ? divisionOpportunityIds.includes(contact.opportunityId) : false)
   );
 
-  const [outreachSummary, collapsePreferences] = await Promise.all([
-    loadOutreachSummary(supabase, divisionId, data.activities, data.tasks),
-    profileId ? loadCollapsePreferences(supabase, profileId) : Promise.resolve(null)
-  ]);
+  const [approvals, evidence, dataReviewItems, outreachSummary, collapsePreferences] =
+    await Promise.all([
+      loadApprovals(supabase, approvalIdsFor(divisionOpportunities)),
+      loadEvidenceForTargets(supabase, [
+        { recordId: divisionId, tableName: "organizations" },
+        ...divisionOpportunityIds.map((id) => ({ recordId: id, tableName: "opportunities" }))
+      ]),
+      loadDataReviewItems(supabase, [
+        { recordId: divisionId, tableName: "organizations" },
+        ...divisionOpportunityIds.map((id) => ({ recordId: id, tableName: "opportunities" }))
+      ]),
+      loadOutreachSummary(supabase, divisionId, data.activities, data.tasks),
+      profileId ? loadCollapsePreferences(supabase, profileId) : Promise.resolve(null)
+    ]);
+
+  const { isActive, activatableOpportunityId } = deriveActivationState(divisionOpportunities);
 
   return {
     activities,
+    activatableOpportunityId,
     approvals,
     collapsePreferences,
     contactGroups: groupContactsByKind(divisionContacts),
     contacts: divisionContacts,
+    dataReviewItems,
     division,
+    evidence,
     filters,
+    isActive,
     opportunities: divisionOpportunities,
     outreachSummary,
     schoolGroups: groupSchoolsByCity(schoolRows),
@@ -1422,12 +1509,15 @@ export async function getSchoolDetail(
     divisionGroups: groupContactsByKind(divisionContacts)
   };
 
+  const { isActive, activatableOpportunityId } = deriveActivationState(opportunities);
+
   return {
     activities: getActivitiesFor({
       activities: data.activities,
       opportunityIds,
       organizationId: schoolId
     }),
+    activatableOpportunityId,
     approvals,
     collapsePreferences,
     contacts: allContacts,
@@ -1439,11 +1529,80 @@ export async function getSchoolDetail(
       ...organizationEvidence,
       ...opportunities.flatMap((opportunity) => opportunity.evidence)
     ],
+    isActive,
     opportunities,
     outreachSummary,
     school,
     tasks: sortTasks(getTasksFor({ organizationId: schoolId, opportunityIds, tasks: data.tasks })),
     venueOrganizationsById: data.venueOrganizationsById,
     venuesById: data.venuesById
+  };
+}
+
+/**
+ * Lightweight snapshot of a school/division's outreach state.
+ * Used on the generic opportunity page banner — avoids loading the full workspace.
+ */
+export async function getOutreachSnapshot(
+  organizationId: string
+): Promise<OutreachSnapshot | null> {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const supabase = await createServerSupabaseClient();
+
+  const { data: outreachRow } = await supabase
+    .from("organization_outreach")
+    .select(
+      "outreach_status,primary_contact_role_id"
+    )
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  let primaryContactLabel: string | null = null;
+
+  if (outreachRow?.primary_contact_role_id) {
+    const { data: role } = await supabase
+      .from("contact_roles")
+      .select("id,person_id,departmental_contact_id,role_title,department")
+      .eq("id", outreachRow.primary_contact_role_id)
+      .maybeSingle();
+
+    if (role?.person_id) {
+      const { data: person } = await supabase
+        .from("people")
+        .select("first_name,last_name")
+        .eq("id", role.person_id)
+        .maybeSingle();
+      if (person) {
+        primaryContactLabel =
+          [person.first_name, person.last_name].filter(Boolean).join(" ") || null;
+      }
+    } else if (role?.departmental_contact_id) {
+      const { data: dept } = await supabase
+        .from("departmental_contacts")
+        .select("display_name")
+        .eq("id", role.departmental_contact_id)
+        .maybeSingle();
+      if (dept) primaryContactLabel = dept.display_name;
+    }
+  }
+
+  const { data: nextFollowUpRow } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("task_kind", "follow_up")
+    .not("status", "in", '("completed","cancelled")')
+    .not("due_date", "is", null)
+    .order("due_date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    nextFollowUp: nextFollowUpRow ?? null,
+    outreachStatus: outreachRow?.outreach_status ?? null,
+    primaryContactLabel
   };
 }

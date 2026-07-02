@@ -2,20 +2,24 @@
 
 import { StatusBadge } from "@/components/crm/status-badge";
 import {
+  addContactAction,
   changeOutreachStatusAction,
   chooseBackupContactAction,
   chooseOutreachRouteAction,
   choosePrimaryContactAction,
+  completeReminderTaskAction,
   logContactAction,
   saveCollapseStateAction
 } from "@/app/(app)/school-outreach/actions";
+import type { AddContactInput, DuplicateWarningResult } from "@/app/(app)/school-outreach/actions";
+import { addToPipelineAction } from "@/app/(app)/research/opportunities/actions";
 import {
-  collapseKey,
   cityGroupCollapseKey,
+  collapseKey,
   isCityGroupCollapsed,
   isSectionCollapsed
 } from "@/lib/crm/collapse-preferences";
-import { getOutreachStatusDisplay } from "@/lib/crm/outreach-labels";
+import { getOpportunityOperationalLabel, getOutreachStatusDisplay } from "@/lib/crm/outreach-labels";
 import type {
   ContactGroup,
   ContactSummary,
@@ -33,6 +37,82 @@ import Link from "next/link";
 
 type OutreachStatus = Database["public"]["Enums"]["outreach_status"];
 type OutreachRoute = Database["public"]["Enums"]["outreach_route"];
+
+// ── Small icon helpers ─────────────────────────────────────────────────────────
+
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+      <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={["h-4 w-4 shrink-0 text-text-muted transition-transform", collapsed ? "" : "rotate-180"].join(" ")}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+    >
+      <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SmallChevronIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={["h-3 w-3 shrink-0 text-text-muted transition-transform", collapsed ? "" : "rotate-180"].join(" ")}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+    >
+      <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ── Modal overlay ─────────────────────────────────────────────────────────────
+
+function ModalOverlay({
+  children,
+  onClose,
+  title
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  title: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 pb-8 pt-20"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-md rounded-card border border-border bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="text-base font-semibold text-text-heading">{title}</h2>
+          <button
+            aria-label="Close"
+            className="rounded p-1 text-text-muted hover:bg-gray-100"
+            onClick={onClose}
+            type="button"
+          >
+            <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-5 pb-5 pt-4">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 // ── Collapsible section ────────────────────────────────────────────────────────
 
@@ -77,16 +157,7 @@ export function CollapsibleSection({
             <p className="mt-0.5 truncate text-sm text-text-muted">{summary}</p>
           ) : null}
         </div>
-        <svg
-          aria-hidden="true"
-          className={["h-4 w-4 shrink-0 text-text-muted transition-transform", collapsed ? "" : "rotate-180"].join(" ")}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ChevronIcon collapsed={collapsed} />
       </button>
       {!collapsed && <div className="border-t border-border px-4 pb-4 pt-3">{children}</div>}
     </section>
@@ -104,64 +175,170 @@ export function OutreachStatusBadge({
   return <StatusBadge tone={display.tone}>{display.label}</StatusBadge>;
 }
 
+// ── Follow-up task with completion control ────────────────────────────────────
+
+function FollowUpTask({ isActive, task }: { isActive: boolean; task: TaskRow }) {
+  const [pending, startTransition] = useTransition();
+  const [completed, setCompleted] = useState(false);
+
+  const complete = () => {
+    if (completed || pending) return;
+    startTransition(async () => {
+      const result = await completeReminderTaskAction(task.id);
+      if ("success" in result) setCompleted(true);
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {isActive ? (
+        <button
+          aria-label="Mark follow-up complete"
+          disabled={pending || completed}
+          onClick={complete}
+          type="button"
+          className={[
+            "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+            completed
+              ? "border-brand-forest bg-brand-forest text-white"
+              : "border-border bg-white hover:border-brand-forest"
+          ].join(" ")}
+        >
+          {completed ? <CheckIcon /> : null}
+        </button>
+      ) : null}
+      <span className={["text-sm", completed ? "text-text-muted line-through" : "text-text-body"].join(" ")}>
+        {task.due_date ? formatDate(task.due_date) : "No date"} — {task.title}
+        {pending ? " …" : ""}
+      </span>
+    </div>
+  );
+}
+
 // ── Contacts and outreach summary ─────────────────────────────────────────────
 
-export function ContactsAndOutreachSummary({
+function ActivationControl({
+  activatableOpportunityId,
+  workspacePath
+}: {
+  activatableOpportunityId: string | null;
+  workspacePath: string;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  if (!activatableOpportunityId) {
+    return (
+      <p className="text-xs text-text-muted">
+        No activatable opportunity. Add this organization to Active Opportunities from the research screen.
+      </p>
+    );
+  }
+
+  return (
+    <form
+      action={(formData) => {
+        startTransition(() => addToPipelineAction(formData));
+      }}
+    >
+      <input name="opportunityId" type="hidden" value={activatableOpportunityId} />
+      <input name="confirmActivation" type="hidden" value="confirmed" />
+      <input name="returnTo" type="hidden" value={workspacePath} />
+      <button
+        className="rounded-control bg-brand-forest px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+        disabled={pending}
+        type="submit"
+      >
+        {pending ? "Adding…" : "Add to Active Opportunities"}
+      </button>
+    </form>
+  );
+}
+
+function ContactsAndOutreachSummaryGrid({
+  activatableOpportunityId,
+  isActive,
   organizationId,
   outreachSummary,
-  contactRoleOptions
+  contactRoleOptions,
+  workspacePath
 }: {
+  activatableOpportunityId: string | null;
+  isActive: boolean;
   organizationId: string;
   outreachSummary: OutreachSummary;
   contactRoleOptions: Array<{ id: string; label: string }>;
+  workspacePath: string;
 }) {
   const { outreachRow, primaryContact, backupContact, lastContactAt, nextFollowUp } =
     outreachSummary;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <SummaryItem label="Primary contact">
-        <PrimaryContactPicker
-          organizationId={organizationId}
-          currentContact={primaryContact}
-          field="primary"
-          options={contactRoleOptions}
-        />
-      </SummaryItem>
-
-      <SummaryItem label="Outreach route">
-        <OutreachRoutePicker
-          organizationId={organizationId}
-          current={outreachRow?.outreach_route ?? "not_decided"}
-        />
-      </SummaryItem>
-
-      <SummaryItem label="Outreach status">
-        <OutreachStatusDropdown
-          organizationId={organizationId}
-          current={outreachRow?.outreach_status ?? "not_contacted"}
-        />
-      </SummaryItem>
-
-      <SummaryItem label="Last contact">
-        <span className="text-sm text-text-body">
-          {lastContactAt ? formatDateTime(lastContactAt) : "None recorded"}
-        </span>
-      </SummaryItem>
-
-      <SummaryItem label="Next follow-up">
-        {nextFollowUp ? (
-          <FollowUpTask task={nextFollowUp} />
-        ) : (
-          <span className="text-sm text-text-muted">None scheduled</span>
-        )}
-      </SummaryItem>
-
-      {backupContact ? (
-        <SummaryItem label="Backup contact">
-          <ContactDetail contact={backupContact} />
-        </SummaryItem>
+    <div className="space-y-4">
+      {!isActive ? (
+        <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+          <p className="font-medium text-amber-800">Research workspace — outreach controls not yet available</p>
+          <p className="mt-0.5 text-amber-700">Contact management (view, add, choose primary) is always available. Route, status, and logging unlock after adding to Active Opportunities.</p>
+          <div className="mt-2">
+            <ActivationControl
+              activatableOpportunityId={activatableOpportunityId}
+              workspacePath={workspacePath}
+            />
+          </div>
+        </div>
       ) : null}
+
+      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <SummaryItem label="Primary contact">
+          <PrimaryContactPicker
+            organizationId={organizationId}
+            currentContact={primaryContact}
+            field="primary"
+            options={contactRoleOptions}
+          />
+        </SummaryItem>
+
+        <SummaryItem label="Outreach route">
+          {isActive ? (
+            <OutreachRoutePicker
+              organizationId={organizationId}
+              current={outreachRow?.outreach_route ?? "not_decided"}
+            />
+          ) : (
+            <span className="text-sm text-text-muted">Not decided</span>
+          )}
+        </SummaryItem>
+
+        <SummaryItem label="Outreach status">
+          {isActive ? (
+            <OutreachStatusDropdown
+              organizationId={organizationId}
+              current={outreachRow?.outreach_status ?? "not_contacted"}
+            />
+          ) : (
+            <span className="text-sm text-text-muted">Not contacted</span>
+          )}
+        </SummaryItem>
+
+        <SummaryItem label="Last contact">
+          <span className="text-sm text-text-body">
+            {lastContactAt ? formatDateTime(lastContactAt) : "Not contacted yet"}
+          </span>
+        </SummaryItem>
+
+        <SummaryItem label="Next follow-up">
+          {nextFollowUp ? (
+            <FollowUpTask isActive={isActive} task={nextFollowUp} />
+          ) : (
+            <span className="text-sm text-text-muted">None scheduled</span>
+          )}
+        </SummaryItem>
+
+        {backupContact ? (
+          <SummaryItem label="Backup contact">
+            <ContactDetail contact={backupContact} />
+          </SummaryItem>
+        ) : null}
+      </dl>
     </div>
   );
 }
@@ -183,17 +360,9 @@ function ContactDetail({ contact }: { contact: PrimaryContactDetail }) {
         <p className="text-xs text-text-muted">{contact.roleTitle}</p>
       ) : null}
       {contact.email ? (
-        <CopyEmailButton email={contact.email} contactLabel={contact.label} />
+        <CopyEmailButton email={contact.email} />
       ) : null}
     </div>
-  );
-}
-
-function FollowUpTask({ task }: { task: TaskRow }) {
-  return (
-    <span className="text-sm text-text-body">
-      {task.due_date ? formatDate(task.due_date) : "No date"} — {task.title}
-    </span>
   );
 }
 
@@ -236,7 +405,7 @@ function PrimaryContactPicker({
         onChange={handleChange}
         value={value}
       >
-        <option value="">— Not selected —</option>
+        <option value="">— No primary contact selected —</option>
         {options.map((opt) => (
           <option key={opt.id} value={opt.id}>
             {opt.label}
@@ -383,18 +552,18 @@ function OutreachStatusDropdown({
 // ── Copy email button ─────────────────────────────────────────────────────────
 
 export function CopyEmailButton({
-  email
+  email,
+  onLogEmailSent
 }: {
   email: string;
-  contactLabel?: string;
+  onLogEmailSent?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [, setShowLog] = useState(false);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(email).then(() => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 3000);
     });
   }, [email]);
 
@@ -405,14 +574,14 @@ export function CopyEmailButton({
         onClick={handleCopy}
         type="button"
       >
-        {copied ? "Copied!" : email}
+        {copied ? "Email copied" : email}
       </button>
-      {copied ? (
+      {copied && onLogEmailSent ? (
         <button
           className="text-xs text-text-muted underline-offset-2 hover:underline"
           onClick={() => {
             setCopied(false);
-            setShowLog(true);
+            onLogEmailSent();
           }}
           type="button"
         >
@@ -423,181 +592,29 @@ export function CopyEmailButton({
   );
 }
 
-// ── Contact groups ─────────────────────────────────────────────────────────────
-
-const GROUP_TITLE: Record<string, string> = {
-  operational: "Operational contacts",
-  other: "Other known contacts",
-  trustees: "Board members and trustees"
-};
-
-export function ContactGroups({
-  groups,
-  heading,
-  preferences
-}: {
-  groups: ContactGroup[];
-  heading?: string;
-  preferences: Json | null | undefined;
-}) {
-  if (groups.length === 0) {
-    return <p className="text-sm text-text-muted">No contacts recorded.</p>;
-  }
-
-  return (
-    <div className="space-y-4">
-      {heading ? (
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">{heading}</h3>
-      ) : null}
-      {groups.map((group) => (
-        <ContactGroupSection key={group.kind} group={group} preferences={preferences} />
-      ))}
-    </div>
-  );
-}
-
-function ContactGroupSection({
-  group,
-  preferences
-}: {
-  group: ContactGroup;
-  preferences: Json | null | undefined;
-}) {
-  const defaultCollapsed = group.kind === "other" || group.kind === "trustees";
-  const sectionKey = group.kind === "operational"
-    ? "operational_contacts"
-    : group.kind === "other"
-      ? "other_contacts"
-      : "trustees";
-
-  const initial = isSectionCollapsed(preferences, sectionKey, defaultCollapsed);
-  const [collapsed, setCollapsed] = useState(initial);
-  const [, startTransition] = useTransition();
-
-  const toggle = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    startTransition(async () => {
-      await saveCollapseStateAction(collapseKey(sectionKey), next);
-    });
-  };
-
-  return (
-    <div className="rounded-sm border border-border">
-      <button
-        aria-expanded={!collapsed}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
-        onClick={toggle}
-        type="button"
-      >
-        <span className="text-sm font-semibold text-text-heading">
-          {GROUP_TITLE[group.kind] ?? group.kind}{" "}
-          <span className="text-xs font-normal text-text-muted">({group.contacts.length})</span>
-        </span>
-        <svg
-          aria-hidden="true"
-          className={["h-3 w-3 shrink-0 text-text-muted transition-transform", collapsed ? "" : "rotate-180"].join(" ")}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {!collapsed ? (
-        <div className="divide-y divide-border border-t border-border">
-          {group.contacts.map((contact) => (
-            <ContactRow key={contact.id} contact={contact} />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function ContactRow({ contact }: { contact: ContactSummary }) {
-  const email = contact.methods.find((m) => m.method_type === "email");
-  const phone = contact.methods.find((m) => m.method_type === "phone");
-
-  return (
-    <div className="grid gap-1 px-3 py-2.5 text-sm sm:grid-cols-[1fr_auto]">
-      <div>
-        <p className="font-medium text-text-body">{contact.label}</p>
-        {contact.roleTitle ? (
-          <p className="text-xs text-text-muted">{contact.roleTitle}</p>
-        ) : null}
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-          {email ? (
-            <CopyEmailButton email={email.parsed_value ?? email.raw_value ?? ""} />
-          ) : null}
-          {phone ? (
-            <span className="text-xs text-text-muted">
-              {phone.parsed_value ?? phone.raw_value}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── School contacts section (school page: school vs division) ─────────────────
-
-export function SchoolContactSection({
-  contactGroupings,
-  preferences
-}: {
-  contactGroupings: SchoolContactGroupings;
-  preferences: Json | null | undefined;
-}) {
-  const hasSchool = contactGroupings.schoolGroups.length > 0;
-  const hasDivision = contactGroupings.divisionGroups.length > 0;
-
-  if (!hasSchool && !hasDivision) {
-    return <p className="text-sm text-text-muted">No contacts recorded.</p>;
-  }
-
-  return (
-    <div className="space-y-5">
-      {hasSchool ? (
-        <ContactGroups
-          groups={contactGroupings.schoolGroups}
-          heading="Direct school contacts"
-          preferences={preferences}
-        />
-      ) : null}
-      {hasDivision ? (
-        <ContactGroups
-          groups={contactGroupings.divisionGroups}
-          heading="Division-level contacts"
-          preferences={preferences}
-        />
-      ) : null}
-    </div>
-  );
-}
-
 // ── Log contact form ──────────────────────────────────────────────────────────
 
 export function LogContactForm({
   organizationId,
   opportunityId,
   contactRoleOptions,
+  initialContactRoleId,
+  initialDirection,
+  initialMethod,
   onClose
 }: {
   organizationId: string;
   opportunityId?: string | null;
   contactRoleOptions: Array<{ id: string; label: string }>;
+  initialContactRoleId?: string;
+  initialDirection?: "outbound" | "inbound";
+  initialMethod?: "email" | "phone";
   onClose?: () => void;
 }) {
-  const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
-  const [method, setMethod] = useState<"email" | "phone">("email");
-  const [phoneOutcome, setPhoneOutcome] = useState<"no_answer" | "voicemail" | "spoke">(
-    "no_answer"
-  );
-  const [contactRoleId, setContactRoleId] = useState("");
+  const [direction, setDirection] = useState<"outbound" | "inbound">(initialDirection ?? "outbound");
+  const [method, setMethod] = useState<"email" | "phone">(initialMethod ?? "email");
+  const [phoneOutcome, setPhoneOutcome] = useState<"no_answer" | "voicemail" | "spoke">("no_answer");
+  const [contactRoleId, setContactRoleId] = useState(initialContactRoleId ?? "");
   const [notes, setNotes] = useState("");
   const [activityAt, setActivityAt] = useState(
     () => new Date().toISOString().slice(0, 16)
@@ -637,7 +654,7 @@ export function LogContactForm({
             onChange={(e) => setContactRoleId(e.target.value)}
             value={contactRoleId}
           >
-            <option value="">— Unspecified —</option>
+            <option value="">— Unknown recipient —</option>
             {contactRoleOptions.map((opt) => (
               <option key={opt.id} value={opt.id}>
                 {opt.label}
@@ -665,8 +682,8 @@ export function LogContactForm({
             onChange={(e) => setDirection(e.target.value as "outbound" | "inbound")}
             value={direction}
           >
-            <option value="outbound">Outbound (we contacted them)</option>
-            <option value="inbound">Inbound (they contacted us)</option>
+            <option value="outbound">We contacted them</option>
+            <option value="inbound">They contacted us</option>
           </select>
         </label>
 
@@ -736,44 +753,457 @@ export function LogContactForm({
   );
 }
 
-// ── Collapsible city groups for Associated High Schools ───────────────────────
+// ── Add contact modal ─────────────────────────────────────────────────────────
 
-export function CityGroupedSchools({
-  groups,
-  preferences
+type ContactKind = "named_person" | "department";
+
+function AddContactModal({
+  organizationId,
+  onClose
 }: {
-  groups: SchoolCityGroup[];
-  preferences: Json | null | undefined;
+  organizationId: string;
+  onClose: () => void;
 }) {
-  if (groups.length === 0) {
-    return <p className="text-sm text-text-muted">No associated schools.</p>;
+  const [kind, setKind] = useState<ContactKind | null>(null);
+  const [warning, setWarning] = useState<DuplicateWarningResult | null>(null);
+  const [pendingInput, setPendingInput] = useState<AddContactInput | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [, startTransition] = useTransition();
+
+  const handleSubmit = (input: AddContactInput, skipDuplicateCheck = false) => {
+    setError(null);
+    setWarning(null);
+    startTransition(async () => {
+      const result = await addContactAction(input, skipDuplicateCheck);
+      if ("success" in result) {
+        setSuccess(true);
+        setTimeout(onClose, 800);
+      } else if ("warning" in result) {
+        setWarning(result.warning);
+        setPendingInput(input);
+      } else {
+        setError(result.error);
+      }
+    });
+  };
+
+  if (success) {
+    return (
+      <ModalOverlay onClose={onClose} title="Add contact">
+        <p className="text-sm text-brand-forest">Contact added successfully.</p>
+      </ModalOverlay>
+    );
+  }
+
+  if (warning && pendingInput) {
+    return (
+      <ModalOverlay onClose={onClose} title="Possible duplicate">
+        <div className="space-y-4">
+          <div className="rounded-sm border border-yellow-300 bg-yellow-50 p-3 text-sm">
+            <p className="font-medium text-yellow-800">
+              {warning.kind === "same_person_org" && "A contact with this name already exists for this organization."}
+              {warning.kind === "same_department_org" && "A department contact with this name already exists for this organization."}
+              {warning.kind === "same_email" && `This email address (${warning.detail ?? ""}) is already on file.`}
+              {warning.kind === "same_phone" && `This phone number (${warning.detail ?? ""}) is already on file.`}
+            </p>
+            <p className="mt-1 text-yellow-700">Existing record: {warning.existingLabel}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="rounded-control border border-border px-4 py-1.5 text-sm font-semibold text-text-body"
+              onClick={onClose}
+              type="button"
+            >
+              Reuse existing — do not create
+            </button>
+            <button
+              className="rounded-control bg-brand-forest px-4 py-1.5 text-sm font-semibold text-white"
+              onClick={() => handleSubmit(pendingInput, true)}
+              type="button"
+            >
+              Create anyway
+            </button>
+          </div>
+        </div>
+      </ModalOverlay>
+    );
+  }
+
+  if (!kind) {
+    return (
+      <ModalOverlay onClose={onClose} title="Add contact">
+        <p className="mb-4 text-sm text-text-muted">What kind of contact are you adding?</p>
+        <div className="flex gap-3">
+          <button
+            className="flex-1 rounded-control border border-border bg-surface px-4 py-3 text-left text-sm hover:bg-gray-50"
+            onClick={() => setKind("named_person")}
+            type="button"
+          >
+            <span className="block font-semibold text-text-heading">Named person</span>
+            <span className="text-text-muted">Someone you know by name</span>
+          </button>
+          <button
+            className="flex-1 rounded-control border border-border bg-surface px-4 py-3 text-left text-sm hover:bg-gray-50"
+            onClick={() => setKind("department")}
+            type="button"
+          >
+            <span className="block font-semibold text-text-heading">Department or office</span>
+            <span className="text-text-muted">A general contact route</span>
+          </button>
+        </div>
+      </ModalOverlay>
+    );
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex justify-end gap-2">
-        <ExpandCollapseAll groupCount={groups.length} />
+    <ModalOverlay
+      onClose={onClose}
+      title={kind === "named_person" ? "Add named person" : "Add department contact"}
+    >
+      {kind === "named_person" ? (
+        <NamedPersonForm
+          organizationId={organizationId}
+          onBack={() => setKind(null)}
+          onSubmit={handleSubmit}
+          error={error}
+        />
+      ) : (
+        <DepartmentContactForm
+          organizationId={organizationId}
+          onBack={() => setKind(null)}
+          onSubmit={handleSubmit}
+          error={error}
+        />
+      )}
+    </ModalOverlay>
+  );
+}
+
+function NamedPersonForm({
+  organizationId,
+  onBack,
+  onSubmit,
+  error
+}: {
+  organizationId: string;
+  onBack: () => void;
+  onSubmit: (input: AddContactInput) => void;
+  error: string | null;
+}) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [department, setDepartment] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<"none" | "primary" | "backup">("none");
+  const [note, setNote] = useState("");
+  const [source, setSource] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      kind: "named_person",
+      organizationId,
+      firstName,
+      lastName,
+      jobTitle: jobTitle || null,
+      department: department || null,
+      email: email || null,
+      phone: phone || null,
+      role,
+      note: note || null,
+      source: source || null
+    });
+  };
+
+  return (
+    <form className="space-y-3" onSubmit={handleSubmit}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="block text-xs font-semibold text-text-muted">First name</span>
+          <input
+            className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            type="text"
+            value={firstName}
+          />
+        </label>
+        <label className="block">
+          <span className="block text-xs font-semibold text-text-muted">Last name</span>
+          <input
+            className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+            onChange={(e) => setLastName(e.target.value)}
+            required
+            type="text"
+            value={lastName}
+          />
+        </label>
       </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="block text-xs font-semibold text-text-muted">Job title (optional)</span>
+          <input
+            className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+            onChange={(e) => setJobTitle(e.target.value)}
+            type="text"
+            value={jobTitle}
+          />
+        </label>
+        <label className="block">
+          <span className="block text-xs font-semibold text-text-muted">Department (optional)</span>
+          <input
+            className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+            onChange={(e) => setDepartment(e.target.value)}
+            type="text"
+            value={department}
+          />
+        </label>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="block text-xs font-semibold text-text-muted">Email (optional)</span>
+          <input
+            className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            value={email}
+          />
+        </label>
+        <label className="block">
+          <span className="block text-xs font-semibold text-text-muted">Phone (optional)</span>
+          <input
+            className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+            onChange={(e) => setPhone(e.target.value)}
+            type="tel"
+            value={phone}
+          />
+        </label>
+      </div>
+      <label className="block">
+        <span className="block text-xs font-semibold text-text-muted">Role</span>
+        <select
+          className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+          onChange={(e) => setRole(e.target.value as "none" | "primary" | "backup")}
+          value={role}
+        >
+          <option value="none">No role assigned</option>
+          <option value="primary">Primary contact</option>
+          <option value="backup">Backup contact</option>
+        </select>
+      </label>
+      <label className="block">
+        <span className="block text-xs font-semibold text-text-muted">Note (optional)</span>
+        <textarea
+          className="mt-1 w-full rounded-control border border-border bg-white px-2 py-1.5 text-sm"
+          onChange={(e) => setNote(e.target.value)}
+          rows={2}
+          value={note}
+        />
+      </label>
+      <label className="block">
+        <span className="block text-xs font-semibold text-text-muted">Source (optional — where did you find this contact?)</span>
+        <input
+          className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+          onChange={(e) => setSource(e.target.value)}
+          placeholder="e.g. school website, LinkedIn"
+          type="text"
+          value={source}
+        />
+      </label>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <div className="flex gap-2">
+        <button className="rounded-control bg-brand-forest px-4 py-1.5 text-sm font-semibold text-white" type="submit">
+          Save contact
+        </button>
+        <button className="rounded-control border border-border px-4 py-1.5 text-sm font-semibold text-text-body" onClick={onBack} type="button">
+          Back
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function DepartmentContactForm({
+  organizationId,
+  onBack,
+  onSubmit,
+  error
+}: {
+  organizationId: string;
+  onBack: () => void;
+  onSubmit: (input: AddContactInput) => void;
+  error: string | null;
+}) {
+  const [displayName, setDisplayName] = useState("");
+  const [func, setFunc] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<"none" | "primary" | "backup">("none");
+  const [note, setNote] = useState("");
+  const [source, setSource] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      kind: "department",
+      organizationId,
+      displayName,
+      function: func || null,
+      email: email || null,
+      phone: phone || null,
+      role,
+      note: note || null,
+      source: source || null
+    });
+  };
+
+  return (
+    <form className="space-y-3" onSubmit={handleSubmit}>
+      <label className="block">
+        <span className="block text-xs font-semibold text-text-muted">Department or route name</span>
+        <input
+          className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder="e.g. Graduation Office, General Enquiries"
+          required
+          type="text"
+          value={displayName}
+        />
+      </label>
+      <label className="block">
+        <span className="block text-xs font-semibold text-text-muted">Function (optional)</span>
+        <input
+          className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+          onChange={(e) => setFunc(e.target.value)}
+          placeholder="e.g. Event planning, Procurement"
+          type="text"
+          value={func}
+        />
+      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="block text-xs font-semibold text-text-muted">Email (optional)</span>
+          <input
+            className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            value={email}
+          />
+        </label>
+        <label className="block">
+          <span className="block text-xs font-semibold text-text-muted">Phone (optional)</span>
+          <input
+            className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+            onChange={(e) => setPhone(e.target.value)}
+            type="tel"
+            value={phone}
+          />
+        </label>
+      </div>
+      <label className="block">
+        <span className="block text-xs font-semibold text-text-muted">Role</span>
+        <select
+          className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+          onChange={(e) => setRole(e.target.value as "none" | "primary" | "backup")}
+          value={role}
+        >
+          <option value="none">No role assigned</option>
+          <option value="primary">Primary contact</option>
+          <option value="backup">Backup contact</option>
+        </select>
+      </label>
+      <label className="block">
+        <span className="block text-xs font-semibold text-text-muted">Note (optional)</span>
+        <textarea
+          className="mt-1 w-full rounded-control border border-border bg-white px-2 py-1.5 text-sm"
+          onChange={(e) => setNote(e.target.value)}
+          rows={2}
+          value={note}
+        />
+      </label>
+      <label className="block">
+        <span className="block text-xs font-semibold text-text-muted">Source (optional)</span>
+        <input
+          className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
+          onChange={(e) => setSource(e.target.value)}
+          placeholder="e.g. school website, LinkedIn"
+          type="text"
+          value={source}
+        />
+      </label>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <div className="flex gap-2">
+        <button className="rounded-control bg-brand-forest px-4 py-1.5 text-sm font-semibold text-white" type="submit">
+          Save contact
+        </button>
+        <button className="rounded-control border border-border px-4 py-1.5 text-sm font-semibold text-text-body" onClick={onBack} type="button">
+          Back
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Contact groups ─────────────────────────────────────────────────────────────
+
+const GROUP_TITLE: Record<string, string> = {
+  operational: "Operational contacts",
+  other: "Other known contacts",
+  trustees: "Board members and trustees"
+};
+
+export function ContactGroups({
+  groups,
+  heading,
+  onLogEmailSent,
+  preferences
+}: {
+  groups: ContactGroup[];
+  heading?: string;
+  onLogEmailSent?: (contactRoleId: string | null) => void;
+  preferences: Json | null | undefined;
+}) {
+  if (groups.length === 0) {
+    return <p className="text-sm text-text-muted">No contacts recorded.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {heading ? (
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">{heading}</h3>
+      ) : null}
       {groups.map((group) => (
-        <CityGroupRow key={group.city} group={group} preferences={preferences} />
+        <ContactGroupSection
+          key={group.kind}
+          group={group}
+          onLogEmailSent={onLogEmailSent}
+          preferences={preferences}
+        />
       ))}
     </div>
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ExpandCollapseAll(_props: { groupCount: number }) {
-  return null;
-}
-
-function CityGroupRow({
+function ContactGroupSection({
   group,
+  onLogEmailSent,
   preferences
 }: {
-  group: SchoolCityGroup;
+  group: ContactGroup;
+  onLogEmailSent?: (contactRoleId: string | null) => void;
   preferences: Json | null | undefined;
 }) {
-  const initial = isCityGroupCollapsed(preferences, group.city);
+  const defaultCollapsed = group.kind === "other" || group.kind === "trustees";
+  const sectionKey = group.kind === "operational"
+    ? "operational_contacts"
+    : group.kind === "other"
+      ? "other_contacts"
+      : "trustees";
+
+  const initial = isSectionCollapsed(preferences, sectionKey, defaultCollapsed);
   const [collapsed, setCollapsed] = useState(initial);
   const [, startTransition] = useTransition();
 
@@ -781,7 +1211,7 @@ function CityGroupRow({
     const next = !collapsed;
     setCollapsed(next);
     startTransition(async () => {
-      await saveCollapseStateAction(cityGroupCollapseKey(group.city), next);
+      await saveCollapseStateAction(collapseKey(sectionKey), next);
     });
   };
 
@@ -794,24 +1224,408 @@ function CityGroupRow({
         type="button"
       >
         <span className="text-sm font-semibold text-text-heading">
-          {group.city}{" "}
-          <span className="text-xs font-normal text-text-muted">
-            ({group.schools.length} school{group.schools.length !== 1 ? "s" : ""})
-          </span>
+          {GROUP_TITLE[group.kind] ?? group.kind}{" "}
+          <span className="text-xs font-normal text-text-muted">({group.contacts.length})</span>
         </span>
-        <svg
-          aria-hidden="true"
-          className={["h-3 w-3 shrink-0 text-text-muted transition-transform", collapsed ? "" : "rotate-180"].join(" ")}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <SmallChevronIcon collapsed={collapsed} />
       </button>
 
       {!collapsed ? (
+        <div className="divide-y divide-border border-t border-border">
+          {group.contacts.map((contact) => (
+            <ContactRow
+              key={contact.id}
+              contact={contact}
+              onLogEmailSent={onLogEmailSent}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ContactRow({
+  contact,
+  onLogEmailSent
+}: {
+  contact: ContactSummary;
+  onLogEmailSent?: (contactRoleId: string | null) => void;
+}) {
+  const email = contact.methods.find((m) => m.method_type === "email");
+  const phone = contact.methods.find((m) => m.method_type === "phone");
+
+  return (
+    <div className="grid gap-1 px-3 py-2.5 text-sm sm:grid-cols-[1fr_auto]">
+      <div>
+        <p className="font-medium text-text-body">{contact.label}</p>
+        {contact.roleTitle ? (
+          <p className="text-xs text-text-muted">{contact.roleTitle}</p>
+        ) : null}
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+          {email ? (
+            <CopyEmailButton
+              email={email.parsed_value ?? email.raw_value ?? ""}
+              onLogEmailSent={
+                onLogEmailSent
+                  ? () => onLogEmailSent(contact.id)
+                  : undefined
+              }
+            />
+          ) : null}
+          {phone ? (
+            <span className="text-xs text-text-muted">
+              {phone.parsed_value ?? phone.raw_value}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── School contacts section (school page: school vs division) ─────────────────
+
+export function SchoolContactSection({
+  contactGroupings,
+  onLogEmailSent,
+  preferences
+}: {
+  contactGroupings: SchoolContactGroupings;
+  onLogEmailSent?: (contactRoleId: string | null) => void;
+  preferences: Json | null | undefined;
+}) {
+  const hasSchool = contactGroupings.schoolGroups.length > 0;
+  const hasDivision = contactGroupings.divisionGroups.length > 0;
+
+  if (!hasSchool && !hasDivision) {
+    return <p className="text-sm text-text-muted">No contacts recorded.</p>;
+  }
+
+  return (
+    <div className="space-y-5">
+      {hasSchool ? (
+        <ContactGroups
+          groups={contactGroupings.schoolGroups}
+          heading="Direct school contacts"
+          onLogEmailSent={onLogEmailSent}
+          preferences={preferences}
+        />
+      ) : null}
+      {hasDivision ? (
+        <ContactGroups
+          groups={contactGroupings.divisionGroups}
+          heading="Division-level contacts"
+          onLogEmailSent={onLogEmailSent}
+          preferences={preferences}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ── Division contacts and outreach panel ───────────────────────────────────────
+
+export function DivisionContactsAndOutreach({
+  activatableOpportunityId,
+  contactGroups,
+  contactRoleOptions,
+  isActive,
+  opportunityId,
+  organizationId,
+  outreachSummary,
+  preferences,
+  workspacePath
+}: {
+  activatableOpportunityId: string | null;
+  contactGroups: ContactGroup[];
+  contactRoleOptions: Array<{ id: string; label: string }>;
+  isActive: boolean;
+  opportunityId?: string | null;
+  organizationId: string;
+  outreachSummary: OutreachSummary;
+  preferences: Json | null | undefined;
+  workspacePath: string;
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logPrefillContactRoleId, setLogPrefillContactRoleId] = useState<string | undefined>(undefined);
+  const [logPrefillMethod, setLogPrefillMethod] = useState<"email" | "phone" | undefined>(undefined);
+  const [logPrefillDirection, setLogPrefillDirection] = useState<"outbound" | "inbound" | undefined>(undefined);
+
+  const openLogForm = (
+    contactRoleId: string | null,
+    method?: "email" | "phone",
+    direction?: "outbound" | "inbound"
+  ) => {
+    setLogPrefillContactRoleId(contactRoleId ?? undefined);
+    setLogPrefillMethod(method);
+    setLogPrefillDirection(direction);
+    setLogOpen(true);
+  };
+
+  return (
+    <>
+      <div className="space-y-5">
+        <ContactsAndOutreachSummaryGrid
+          activatableOpportunityId={activatableOpportunityId}
+          isActive={isActive}
+          organizationId={organizationId}
+          outreachSummary={outreachSummary}
+          contactRoleOptions={contactRoleOptions}
+          workspacePath={workspacePath}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="rounded-control border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-body hover:bg-gray-50"
+            onClick={() => setAddOpen(true)}
+            type="button"
+          >
+            + Add contact
+          </button>
+          {isActive ? (
+            <button
+              className="rounded-control border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-body hover:bg-gray-50"
+              onClick={() => openLogForm(null)}
+              type="button"
+            >
+              Log contact
+            </button>
+          ) : null}
+        </div>
+
+        <ContactGroups
+          groups={contactGroups}
+          onLogEmailSent={isActive ? (roleId) => openLogForm(roleId, "email", "outbound") : undefined}
+          preferences={preferences}
+        />
+      </div>
+
+      {addOpen ? (
+        <AddContactModal organizationId={organizationId} onClose={() => setAddOpen(false)} />
+      ) : null}
+
+      {logOpen ? (
+        <ModalOverlay onClose={() => setLogOpen(false)} title="Log contact">
+          <LogContactForm
+            organizationId={organizationId}
+            opportunityId={opportunityId}
+            contactRoleOptions={contactRoleOptions}
+            initialContactRoleId={logPrefillContactRoleId}
+            initialMethod={logPrefillMethod}
+            initialDirection={logPrefillDirection}
+            onClose={() => setLogOpen(false)}
+          />
+        </ModalOverlay>
+      ) : null}
+    </>
+  );
+}
+
+// ── School contacts and outreach panel ────────────────────────────────────────
+
+export function SchoolContactsAndOutreach({
+  activatableOpportunityId,
+  contactGroupings,
+  contactRoleOptions,
+  isActive,
+  opportunityId,
+  organizationId,
+  outreachSummary,
+  preferences,
+  workspacePath
+}: {
+  activatableOpportunityId: string | null;
+  contactGroupings: SchoolContactGroupings;
+  contactRoleOptions: Array<{ id: string; label: string }>;
+  isActive: boolean;
+  opportunityId?: string | null;
+  organizationId: string;
+  outreachSummary: OutreachSummary;
+  preferences: Json | null | undefined;
+  workspacePath: string;
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logPrefillContactRoleId, setLogPrefillContactRoleId] = useState<string | undefined>(undefined);
+  const [logPrefillMethod, setLogPrefillMethod] = useState<"email" | "phone" | undefined>(undefined);
+  const [logPrefillDirection, setLogPrefillDirection] = useState<"outbound" | "inbound" | undefined>(undefined);
+
+  const openLogForm = (
+    contactRoleId: string | null,
+    method?: "email" | "phone",
+    direction?: "outbound" | "inbound"
+  ) => {
+    setLogPrefillContactRoleId(contactRoleId ?? undefined);
+    setLogPrefillMethod(method);
+    setLogPrefillDirection(direction);
+    setLogOpen(true);
+  };
+
+  return (
+    <>
+      <div className="space-y-5">
+        <ContactsAndOutreachSummaryGrid
+          activatableOpportunityId={activatableOpportunityId}
+          isActive={isActive}
+          organizationId={organizationId}
+          outreachSummary={outreachSummary}
+          contactRoleOptions={contactRoleOptions}
+          workspacePath={workspacePath}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="rounded-control border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-body hover:bg-gray-50"
+            onClick={() => setAddOpen(true)}
+            type="button"
+          >
+            + Add contact
+          </button>
+          {isActive ? (
+            <button
+              className="rounded-control border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-body hover:bg-gray-50"
+              onClick={() => openLogForm(null)}
+              type="button"
+            >
+              Log contact
+            </button>
+          ) : null}
+        </div>
+
+        <SchoolContactSection
+          contactGroupings={contactGroupings}
+          onLogEmailSent={isActive ? (roleId) => openLogForm(roleId, "email", "outbound") : undefined}
+          preferences={preferences}
+        />
+      </div>
+
+      {addOpen ? (
+        <AddContactModal organizationId={organizationId} onClose={() => setAddOpen(false)} />
+      ) : null}
+
+      {logOpen ? (
+        <ModalOverlay onClose={() => setLogOpen(false)} title="Log contact">
+          <LogContactForm
+            organizationId={organizationId}
+            opportunityId={opportunityId}
+            contactRoleOptions={contactRoleOptions}
+            initialContactRoleId={logPrefillContactRoleId}
+            initialMethod={logPrefillMethod}
+            initialDirection={logPrefillDirection}
+            onClose={() => setLogOpen(false)}
+          />
+        </ModalOverlay>
+      ) : null}
+    </>
+  );
+}
+
+// ── City grouped schools with real expand/collapse all ────────────────────────
+
+export function CityGroupedSchools({
+  groups,
+  preferences
+}: {
+  groups: SchoolCityGroup[];
+  preferences: Json | null | undefined;
+}) {
+  const initialCollapsed = Object.fromEntries(
+    groups.map((g) => [g.city, isCityGroupCollapsed(preferences, g.city)])
+  );
+  const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>(initialCollapsed);
+  const [, startTransition] = useTransition();
+
+  const toggleCity = useCallback((city: string) => {
+    const next = !collapsedMap[city];
+    setCollapsedMap((prev) => ({ ...prev, [city]: next }));
+    startTransition(async () => {
+      await saveCollapseStateAction(cityGroupCollapseKey(city), next);
+    });
+  }, [collapsedMap]);
+
+  const expandAll = () => {
+    const next = Object.fromEntries(groups.map((g) => [g.city, false]));
+    setCollapsedMap(next);
+    startTransition(async () => {
+      await Promise.all(
+        groups.map((g) => saveCollapseStateAction(cityGroupCollapseKey(g.city), false))
+      );
+    });
+  };
+
+  const collapseAll = () => {
+    const next = Object.fromEntries(groups.map((g) => [g.city, true]));
+    setCollapsedMap(next);
+    startTransition(async () => {
+      await Promise.all(
+        groups.map((g) => saveCollapseStateAction(cityGroupCollapseKey(g.city), true))
+      );
+    });
+  };
+
+  if (groups.length === 0) {
+    return <p className="text-sm text-text-muted">No associated schools.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-end gap-2">
+        <button
+          className="text-xs text-text-muted underline-offset-2 hover:underline"
+          onClick={expandAll}
+          type="button"
+        >
+          Expand all
+        </button>
+        <button
+          className="text-xs text-text-muted underline-offset-2 hover:underline"
+          onClick={collapseAll}
+          type="button"
+        >
+          Collapse all
+        </button>
+      </div>
+      {groups.map((group) => (
+        <CityGroupRow
+          key={group.city}
+          group={group}
+          isCollapsed={collapsedMap[group.city] ?? true}
+          onToggle={() => toggleCity(group.city)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CityGroupRow({
+  group,
+  isCollapsed,
+  onToggle
+}: {
+  group: SchoolCityGroup;
+  isCollapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="rounded-sm border border-border">
+      <button
+        aria-expanded={!isCollapsed}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+        onClick={onToggle}
+        type="button"
+      >
+        <span className="text-sm font-semibold text-text-heading">
+          {group.city}{" "}
+          <span className="text-xs font-normal text-text-muted">
+            · {group.schools.length} school{group.schools.length !== 1 ? "s" : ""}
+          </span>
+        </span>
+        <SmallChevronIcon collapsed={isCollapsed} />
+      </button>
+
+      {!isCollapsed ? (
         <div className="border-t border-border">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
@@ -854,12 +1668,19 @@ function CityGroupRow({
                   <td className="px-3 py-2 text-text-muted">
                     {school.contact?.label ?? "—"}
                   </td>
-                  <td className="px-3 py-2 text-text-muted">—</td>
-                  <td className="px-3 py-2">
-                    <OutreachStatusBadge status={null} />
+                  <td className="px-3 py-2 text-text-muted">
+                    {school.lastContactAt ? formatDateTime(school.lastContactAt) : "—"}
                   </td>
                   <td className="px-3 py-2">
-                    <span className="text-text-muted">{school.outreachStatus.label}</span>
+                    <OutreachStatusBadge status={school.manualStatus} />
+                  </td>
+                  <td className="px-3 py-2 text-text-muted">
+                    {school.graduationOpportunity
+                      ? getOpportunityOperationalLabel(
+                          school.graduationOpportunity.researchStatus,
+                          school.graduationOpportunity.pipelineStage
+                        )
+                      : "No opportunity"}
                   </td>
                 </tr>
               ))}

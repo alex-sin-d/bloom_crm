@@ -18,7 +18,13 @@ export function SidebarNav({ mobile = false }: { mobile?: boolean }) {
         <div
           className={[
             "grid gap-1",
-            mobileItems.length === 3 ? "grid-cols-3" : "grid-cols-4"
+            mobileItems.length >= 6
+              ? "grid-cols-3"
+              : mobileItems.length === 5
+              ? "grid-cols-5"
+              : mobileItems.length === 3
+                ? "grid-cols-3"
+                : "grid-cols-4"
           ].join(" ")}
         >
           {mobileItems.map((item) => {

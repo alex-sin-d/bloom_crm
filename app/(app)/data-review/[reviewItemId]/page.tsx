@@ -1,4 +1,4 @@
-import { PlaceholderPage } from "@/components/ui/placeholder-page";
+import { redirect } from "next/navigation";
 
 type ReviewItemPageProps = {
   params: Promise<{ reviewItemId: string }>;
@@ -7,12 +7,5 @@ type ReviewItemPageProps = {
 export default async function ReviewItemPage({ params }: ReviewItemPageProps) {
   const { reviewItemId } = await params;
 
-  return (
-    <PlaceholderPage
-      eyebrow="Data issues"
-      title={`Data issue ${reviewItemId}`}
-      description="This future page will show the issue, supporting source data, recommendation, and explicit decision controls."
-      sections={["Issue", "Source evidence", "Recommendation", "Decision", "Audit"]}
-    />
-  );
+  redirect(`/data-review?review=${reviewItemId}`);
 }

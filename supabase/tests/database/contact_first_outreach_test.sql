@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(42);
+select plan(33);
 
 -- ── Test data setup ────────────────────────────────────────────────────────────
 
@@ -91,16 +91,23 @@ select results_eq(
 
 select throws_ok(
   $$ insert into public.organization_outreach (organization_id) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') $$,
+  '23505',
+  'duplicate key value violates unique constraint "organization_outreach_organization_id_key"',
   'organization_outreach is unique per organization'
 );
 
 -- ── Check constraint: primary <> backup ────────────────────────────────────────
 
--- Create a contact_role to use in tests
-insert into public.contact_roles (id, organization_id, contact_category)
+-- Create people and contact_roles to use in tests
+insert into public.people (id, first_name, last_name, created_by)
 values
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'named_person'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'named_person');
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Test', 'Person One', '11111111-1111-1111-1111-111111111111'),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'Test', 'Person Two', '11111111-1111-1111-1111-111111111111');
+
+insert into public.contact_roles (id, organization_id, contact_category, person_id)
+values
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'named_person', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'named_person', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 
 insert into public.organization_outreach (organization_id, created_by)
 values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111');
@@ -111,6 +118,8 @@ select throws_ok(
      set primary_contact_role_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc',
          backup_contact_role_id  = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
      where organization_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' $$,
+  '23514',
+  'new row for relation "organization_outreach" violates check constraint "organization_outreach_contacts_distinct"',
   'primary and backup contact must be distinct'
 );
 
@@ -142,6 +151,8 @@ set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222"
 select throws_ok(
   $$ insert into public.organization_outreach (organization_id)
      values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') $$,
+  '42501',
+  'new row violates row-level security policy for table "organization_outreach"',
   'inactive user cannot insert organization_outreach'
 );
 
@@ -185,6 +196,8 @@ select throws_ok(
      set status_changed_at = now(),
          status_changed_by = null
      where organization_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
+  '23514',
+  'new row for relation "organization_outreach" violates check constraint "organization_outreach_status_change_actor_check"',
   'status_changed_at and status_changed_by must both be set or both null'
 );
 

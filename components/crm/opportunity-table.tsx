@@ -5,6 +5,7 @@ import {
   formatPipelineStageLabel,
   formatResearchStatusLabel
 } from "@/lib/crm/format";
+import { getOpportunityWorkspaceHref } from "@/lib/crm/outreach-labels";
 import type { OpportunityListItem } from "@/lib/crm/types";
 import Link from "next/link";
 
@@ -44,12 +45,17 @@ export function OpportunityTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row) => {
+            const workspaceHref = getOpportunityWorkspaceHref(
+              row.opportunityType,
+              row.organization?.id
+            );
+            return (
             <tr className="border-b border-border align-top hover:bg-surface-subtle/60" key={row.id}>
               <td className="px-4 py-3">
                 <Link
                   className="font-semibold text-text-heading hover:text-brand-forest"
-                  href={`/opportunities/${row.id}`}
+                  href={workspaceHref ?? `/opportunities/${row.id}`}
                 >
                   {row.opportunityName}
                 </Link>
@@ -148,6 +154,21 @@ export function OpportunityTable({
                   >
                     Preview research
                   </Link>
+                ) : workspaceHref ? (
+                  <div className="flex flex-col gap-1">
+                    <Link
+                      className="rounded-control border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-body"
+                      href={workspaceHref}
+                    >
+                      Open workspace
+                    </Link>
+                    <Link
+                      className="text-xs text-text-muted hover:text-text-body"
+                      href={`/opportunities/${row.id}`}
+                    >
+                      View opportunity details
+                    </Link>
+                  </div>
                 ) : (
                   <Link
                     className="rounded-control border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-body"
@@ -158,7 +179,8 @@ export function OpportunityTable({
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

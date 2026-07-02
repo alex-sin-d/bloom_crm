@@ -8,6 +8,7 @@ import {
   getActivationBlocker
 } from "@/lib/crm/add-to-pipeline";
 import { getProtectedSession } from "@/lib/auth/session";
+import { getOpportunityWorkspaceHref } from "@/lib/crm/outreach-labels";
 import { getRecordTypeId } from "@/lib/crm/shared-queries";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -60,7 +61,7 @@ export async function addToPipelineAction(formData: FormData) {
   const { data: opportunity, error: opportunityError } = await supabase
     .from("opportunities")
     .select(
-      "id,opportunity_name,active_cycle_year,research_status,pipeline_stage,assigned_owner_id,added_to_pipeline_at,added_to_pipeline_by"
+      "id,opportunity_name,active_cycle_year,research_status,pipeline_stage,assigned_owner_id,added_to_pipeline_at,added_to_pipeline_by,opportunity_type,primary_organization_id"
     )
     .eq("id", opportunityId)
     .maybeSingle();
@@ -69,8 +70,16 @@ export async function addToPipelineAction(formData: FormData) {
     redirect(withMessage(returnTo, "error", "opportunity-not-found"));
   }
 
+  const workspaceHref = getOpportunityWorkspaceHref(
+    opportunity.opportunity_type,
+    opportunity.primary_organization_id
+  );
+
   const blocker = getActivationBlocker(opportunity);
   if (blocker === "already_active") {
+    if (workspaceHref) {
+      redirect(`${workspaceHref}?activated=1`);
+    }
     redirect(`/pipeline?success=already-active&opportunity=${opportunity.id}`);
   }
 
@@ -138,6 +147,13 @@ export async function addToPipelineAction(formData: FormData) {
   revalidatePath("/research/opportunities");
   revalidatePath("/pipeline");
   revalidatePath(`/opportunities/${opportunity.id}`);
+  if (workspaceHref) {
+    revalidatePath(workspaceHref);
+  }
+
+  if (workspaceHref) {
+    redirect(`${workspaceHref}?activated=1`);
+  }
 
   redirect(
     `/pipeline?success=added-to-pipeline&opportunity=${opportunity.id}&stage=${INITIAL_ACTIVE_PIPELINE_STAGE}`

@@ -1,5 +1,23 @@
 import type { CrmEnums } from "@/lib/crm/types.js";
 
+/**
+ * Returns the canonical workspace href for a school or division opportunity,
+ * or null for all other opportunity types.
+ */
+export function getOpportunityWorkspaceHref(
+  opportunityType: CrmEnums["opportunity_type"],
+  organizationId: string | null | undefined
+): string | null {
+  if (!organizationId) return null;
+  if (opportunityType === "school") {
+    return `/school-outreach/schools/${organizationId}`;
+  }
+  if (opportunityType === "division") {
+    return `/school-outreach/divisions/${organizationId}`;
+  }
+  return null;
+}
+
 export type OutreachStatusTone =
   | "danger"
   | "neutral"

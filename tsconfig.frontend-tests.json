@@ -20,8 +20,10 @@
     "lib/crm/business-days.ts",
     "lib/crm/collapse-preferences.ts",
     "lib/crm/contact-duplicates.ts",
+    "lib/crm/data-review-logic.ts",
     "lib/crm/outreach-labels.ts",
     "lib/crm/outreach-rules.ts",
+    "lib/crm/task-logic.ts",
     "lib/crm/types.ts",
     "lib/supabase/database.types.ts"
   ]

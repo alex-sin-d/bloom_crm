@@ -13,22 +13,23 @@ import {
 } from "@/components/crm/school-outreach";
 import {
   CollapsibleSection,
-  ContactsAndOutreachSummary,
-  SchoolContactSection
+  SchoolContactsAndOutreach
 } from "@/components/crm/outreach-contacts";
 import { requireAuthorizedSession } from "@/lib/auth/session";
 import { getSchoolDetail } from "@/lib/crm/school-outreach-queries";
+import { getOutreachRouteLabel, getOutreachStatusLabel } from "@/lib/crm/outreach-labels";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 type SchoolPageProps = {
   params: Promise<{ schoolId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function SchoolPage({ params }: SchoolPageProps) {
+export default async function SchoolPage({ params, searchParams }: SchoolPageProps) {
   const session = await requireAuthorizedSession();
 
-  const { schoolId } = await params;
+  const [{ schoolId }, rawSearchParams] = await Promise.all([params, searchParams]);
   const detail = await getSchoolDetail(schoolId, session.profile.id);
 
   if (!detail) {
@@ -41,6 +42,16 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
   }));
 
   const opportunity = detail.opportunities[0] ?? null;
+
+  const outreachStatusLabel = getOutreachStatusLabel(
+    detail.outreachSummary.outreachRow?.outreach_status ?? null
+  );
+  const outreachRouteLabel = getOutreachRouteLabel(
+    detail.outreachSummary.outreachRow?.outreach_route ?? null
+  );
+
+  const workspacePath = `/school-outreach/schools/${schoolId}`;
+  const showActivatedBanner = (rawSearchParams as Record<string, string | undefined>).activated === "1";
 
   return (
     <section className="mx-auto max-w-7xl space-y-5">
@@ -72,7 +83,13 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
         }
       />
 
-      {/* Compact header */}
+      {showActivatedBanner ? (
+        <div className="rounded-card border border-green-300 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+          Added to Active Opportunities. Contact and outreach tools are now available.
+        </div>
+      ) : null}
+
+      {/* Compact school identity and parent-division header */}
       <section className="rounded-card border border-border bg-surface p-4 shadow-soft">
         <OrganizationBasics organization={detail.school} />
         <dl className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -97,30 +114,30 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
         </dl>
       </section>
 
-      {/* 1. Contacts and outreach — first major section */}
+      {/* 1. Contacts and outreach */}
       <CollapsibleSection
         preferences={detail.collapsePreferences}
         sectionKey="contacts_and_outreach"
         title="Contacts and outreach"
-        summary={`Status: ${detail.outreachSummary.outreachRow?.outreach_status?.replace(/_/g, " ") ?? "not contacted"} · Route: ${detail.outreachSummary.outreachRow?.outreach_route?.replace(/_/g, " ") ?? "not decided"}`}
+        summary={`${detail.contacts.length} known contacts · ${outreachStatusLabel} · ${outreachRouteLabel}`}
       >
-        <div className="space-y-5">
-          <ContactsAndOutreachSummary
-            organizationId={detail.school.id}
-            outreachSummary={detail.outreachSummary}
-            contactRoleOptions={contactRoleOptions}
-          />
-          <SchoolContactSection
-            contactGroupings={detail.contactGroupings}
-            preferences={detail.collapsePreferences}
-          />
-        </div>
+        <SchoolContactsAndOutreach
+          activatableOpportunityId={detail.activatableOpportunityId}
+          contactGroupings={detail.contactGroupings}
+          contactRoleOptions={contactRoleOptions}
+          isActive={detail.isActive}
+          opportunityId={opportunity?.id}
+          organizationId={detail.school.id}
+          outreachSummary={detail.outreachSummary}
+          preferences={detail.collapsePreferences}
+          workspacePath={workspacePath}
+        />
       </CollapsibleSection>
 
       {/* 2. Graduation and venue */}
       <CollapsibleSection
         preferences={detail.collapsePreferences}
-        sectionKey="contacts_and_outreach"
+        sectionKey="graduation_venue"
         title="Graduation and venue"
         summary={`${detail.events.length} event record${detail.events.length !== 1 ? "s" : ""}`}
       >
@@ -134,7 +151,7 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
       {/* 3. Opportunity status */}
       <CollapsibleSection
         preferences={detail.collapsePreferences}
-        sectionKey="contacts_and_outreach"
+        sectionKey="opportunity_status"
         title="Opportunity status"
         summary={
           opportunity
@@ -149,7 +166,7 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
       <CollapsibleSection
         defaultCollapsed
         preferences={detail.collapsePreferences}
-        sectionKey="contacts_and_outreach"
+        sectionKey="approvals"
         title="Approvals"
         summary={`${detail.approvals.length} item${detail.approvals.length !== 1 ? "s" : ""}`}
       >
@@ -171,8 +188,8 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
           </div>
         </DetailSection>
 
+        {/* 6. Research evidence and data issues */}
         <aside className="space-y-5">
-          {/* 6. Research evidence and data issues */}
           <CollapsibleSection
             defaultCollapsed
             preferences={detail.collapsePreferences}

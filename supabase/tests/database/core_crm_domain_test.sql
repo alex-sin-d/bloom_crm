@@ -122,7 +122,7 @@ insert into public.organizations (
 values
   (
     'aaaaaaaa-1000-0000-0000-000000000001',
-    'Holy Cross High School',
+    '[pgtap-domain] Holy Cross High School',
     'school',
     'qualified',
     'Saskatoon',
@@ -131,7 +131,7 @@ values
   ),
   (
     'aaaaaaaa-1000-0000-0000-000000000002',
-    'TCU Place',
+    '[pgtap-domain] TCU Place',
     'venue',
     'qualified',
     'Saskatoon',
@@ -168,7 +168,7 @@ insert into public.events (
 )
 values (
   'cccccccc-1000-0000-0000-000000000001',
-  'Holy Cross Graduation',
+  '[pgtap-domain] Holy Cross Graduation',
   'aaaaaaaa-1000-0000-0000-000000000001',
   'bbbbbbbb-1000-0000-0000-000000000001',
   2027,
@@ -212,7 +212,7 @@ insert into public.opportunities (
 )
 values (
   'ffffffff-1000-0000-0000-000000000001',
-  'Holy Cross Graduation 2027',
+  '[pgtap-domain] Holy Cross Graduation 2027',
   'school',
   'aaaaaaaa-1000-0000-0000-000000000001',
   'cccccccc-1000-0000-0000-000000000001',
@@ -399,7 +399,7 @@ select lives_ok(
     )
     values (
       'ffffffff-1000-0000-0000-000000000002',
-      'Holy Cross Verbal Interest',
+      '[pgtap-domain] Holy Cross Verbal Interest',
       'school',
       'aaaaaaaa-1000-0000-0000-000000000001',
       2027,
@@ -541,7 +541,7 @@ select lives_ok(
       status
     )
     values (
-      'Holy Cross High School',
+      '[pgtap-domain] Holy Cross High School',
       'school',
       'qualified'
     );
@@ -562,9 +562,9 @@ reset role;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 set local role authenticated;
 
-select is(
-  (select count(*)::integer from public.opportunities),
-  2,
+select ok(
+  (select count(*)::integer from public.opportunities
+   where id in ('ffffffff-1000-0000-0000-000000000001', 'ffffffff-1000-0000-0000-000000000002')) = 2,
   'active owners can read core CRM opportunities'
 );
 

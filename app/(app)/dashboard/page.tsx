@@ -4,9 +4,9 @@ import { requireAuthorizedSession } from "@/lib/auth/session";
 import { getDashboardSummary } from "@/lib/crm/dashboard-queries";
 
 export default async function DashboardPage() {
-  await requireAuthorizedSession();
+  const session = await requireAuthorizedSession();
 
-  const summary = await getDashboardSummary();
+  const summary = await getDashboardSummary(session.profile.id);
 
   return (
     <section className="mx-auto max-w-7xl">
