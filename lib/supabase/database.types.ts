@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       activities: {
@@ -1604,8 +1629,91 @@ export type Database = {
           },
         ]
       }
+      organization_relationships: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          child_organization_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          parent_organization_id: string
+          relationship_type: Database["public"]["Enums"]["organization_relationship_type"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          child_organization_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          parent_organization_id: string
+          relationship_type?: Database["public"]["Enums"]["organization_relationship_type"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          child_organization_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          parent_organization_id?: string
+          relationship_type?: Database["public"]["Enums"]["organization_relationship_type"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_relationships_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_relationships_child_organization_id_fkey"
+            columns: ["child_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_relationships_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_relationships_parent_organization_id_fkey"
+            columns: ["parent_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_relationships_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
+          address_line_1: string | null
+          address_line_2: string | null
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
@@ -1616,11 +1724,13 @@ export type Database = {
           created_by: string | null
           date_verified: string | null
           id: string
+          internal_notes: string | null
           main_approval_route: string | null
           name: string
           normalized_name: string | null
           opportunity_notes: string | null
           organization_type: Database["public"]["Enums"]["organization_type"]
+          postal_code: string | null
           province: string | null
           status: Database["public"]["Enums"]["organization_status"]
           tags: string[]
@@ -1629,6 +1739,8 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          address_line_1?: string | null
+          address_line_2?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -1639,11 +1751,13 @@ export type Database = {
           created_by?: string | null
           date_verified?: string | null
           id?: string
+          internal_notes?: string | null
           main_approval_route?: string | null
           name: string
           normalized_name?: string | null
           opportunity_notes?: string | null
           organization_type: Database["public"]["Enums"]["organization_type"]
+          postal_code?: string | null
           province?: string | null
           status?: Database["public"]["Enums"]["organization_status"]
           tags?: string[]
@@ -1652,6 +1766,8 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          address_line_1?: string | null
+          address_line_2?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -1662,11 +1778,13 @@ export type Database = {
           created_by?: string | null
           date_verified?: string | null
           id?: string
+          internal_notes?: string | null
           main_approval_route?: string | null
           name?: string
           normalized_name?: string | null
           opportunity_notes?: string | null
           organization_type?: Database["public"]["Enums"]["organization_type"]
+          postal_code?: string | null
           province?: string | null
           status?: Database["public"]["Enums"]["organization_status"]
           tags?: string[]
@@ -3157,6 +3275,13 @@ export type Database = {
         | "venue"
         | "event"
         | "other"
+      organization_relationship_type:
+        | "parent_child"
+        | "school_division_school"
+        | "venue_operator"
+        | "event_partner"
+        | "affiliated"
+        | "other"
       organization_status:
         | "research_only"
         | "qualified"
@@ -3449,6 +3574,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       activity_direction: ["inbound", "outbound"],
@@ -3706,6 +3834,14 @@ export const Constants = {
         "trades",
         "venue",
         "event",
+        "other",
+      ],
+      organization_relationship_type: [
+        "parent_child",
+        "school_division_school",
+        "venue_operator",
+        "event_partner",
+        "affiliated",
         "other",
       ],
       organization_status: [

@@ -5,6 +5,8 @@ export type CrmEnums = Database["public"]["Enums"];
 export type OpportunityRow = Database["public"]["Tables"]["opportunities"]["Row"];
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 export type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row"];
+export type OrganizationRelationshipRow =
+  Database["public"]["Tables"]["organization_relationships"]["Row"];
 export type EventRow = Database["public"]["Tables"]["events"]["Row"];
 export type VenueRow = Database["public"]["Tables"]["venues"]["Row"];
 export type ImportedResearchScoreRow =

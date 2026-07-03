@@ -1,12 +1,13 @@
+import { ActivitySummarySection } from "@/components/crm/activity-timeline";
 import { PageHeader } from "@/components/crm/page-header";
 import { EnumBadge, StatusBadge } from "@/components/crm/status-badge";
 import { requireAuthorizedSession } from "@/lib/auth/session";
+import { getActivityTimeline } from "@/lib/crm/activity-queries";
 import {
   compactList,
   formatApprovalRequirementLabel,
   formatApprovalStatusLabel,
   formatDate,
-  formatDateTime,
   formatEnumLabel,
   formatPipelineStageLabel,
   formatResearchStatusLabel
@@ -26,7 +27,14 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
   await requireAuthorizedSession();
 
   const { opportunityId } = await params;
-  const detail = await getOpportunityDetail(opportunityId);
+  const [detail, activityTimeline] = await Promise.all([
+    getOpportunityDetail(opportunityId),
+    getActivityTimeline({
+      filters: { includeSystem: false },
+      limit: 10,
+      scope: { kind: "opportunity", opportunityId }
+    })
+  ]);
 
   if (!detail) {
     notFound();
@@ -206,25 +214,6 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
             ) : (
               <EmptyLine>No main or backup contact route is linked.</EmptyLine>
             )}
-            <div className="mt-5">
-              <h3 className="text-sm font-semibold text-text-heading">Recent activity</h3>
-              {detail.activities.length > 0 ? (
-                <ul className="mt-3 divide-y divide-border rounded-control border border-border">
-                  {detail.activities.map((activity) => (
-                    <li className="px-3 py-3" key={activity.id}>
-                      <p className="font-medium text-text-body">
-                        {formatEnumLabel(activity.activity_type)} · {formatDateTime(activity.activity_at)}
-                      </p>
-                      <p className="mt-1 text-sm text-text-muted">
-                        {activity.summary || activity.subject || activity.outcome || "No summary"}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyLine>No outreach activity has been logged.</EmptyLine>
-              )}
-            </div>
           </DetailSection>
 
           <DetailSection title="Approvals and fit">
@@ -368,22 +357,12 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
             )}
           </DetailSection>
 
-          <DetailSection title="History">
-            {detail.auditLog.length > 0 ? (
-              <ul className="space-y-2">
-                {detail.auditLog.map((entry) => (
-                  <li className="rounded-control border border-border bg-surface-subtle px-3 py-2" key={entry.id}>
-                    <p className="font-medium text-text-body">{formatEnumLabel(entry.action_type)}</p>
-                    <p className="mt-1 text-sm text-text-muted">
-                      {entry.reason ?? "Audit entry"} · {formatDateTime(entry.created_at)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyLine>No audit entries are linked yet.</EmptyLine>
-            )}
-          </DetailSection>
+          <ActivitySummarySection
+            emptyText="No activity has been recorded for this opportunity yet."
+            events={activityTimeline.events}
+            title="Activity"
+            viewAllHref={`/activity?q=${encodeURIComponent(opportunity.opportunityName)}`}
+          />
         </aside>
       </div>
     </section>

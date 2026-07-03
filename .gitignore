@@ -28,6 +28,7 @@ coverage/
 playwright-report/
 test-results/
 .frontend-test-dist/
+.integration-test-dist/
 .playwright-mcp/
 
 # vercel

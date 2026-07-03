@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/crm/page-header";
+import { ActivitySummarySection } from "@/components/crm/activity-timeline";
 import {
-  ActivityList,
   ApprovalList,
   DataReviewList,
   DetailSection,
@@ -17,6 +17,7 @@ import {
   DivisionContactsAndOutreach
 } from "@/components/crm/outreach-contacts";
 import { requireAuthorizedSession } from "@/lib/auth/session";
+import { getActivityTimeline } from "@/lib/crm/activity-queries";
 import {
   getSchoolDivisionDetail,
   parseSchoolOutreachSearch
@@ -38,7 +39,14 @@ export default async function SchoolDivisionPage({
 
   const [{ divisionId }, rawSearchParams] = await Promise.all([params, searchParams]);
   const filters = parseSchoolOutreachSearch(rawSearchParams);
-  const detail = await getSchoolDivisionDetail(divisionId, { q: filters.q }, session.profile.id);
+  const [detail, activityTimeline] = await Promise.all([
+    getSchoolDivisionDetail(divisionId, { q: filters.q }, session.profile.id),
+    getActivityTimeline({
+      filters: { includeSystem: false },
+      limit: 10,
+      scope: { kind: "division", organizationId: divisionId }
+    })
+  ]);
 
   if (!detail) {
     notFound();
@@ -157,18 +165,19 @@ export default async function SchoolDivisionPage({
 
       {/* 5. Tasks and activity */}
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
-        <DetailSection title="Tasks and activity">
-          <div className="space-y-4">
+        <div className="space-y-5">
+          <DetailSection title="Open tasks">
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-text-heading">Open tasks</h3>
               <TaskList tasks={detail.tasks} />
             </div>
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-text-heading">Recent activity</h3>
-              <ActivityList activities={detail.activities} />
-            </div>
-          </div>
-        </DetailSection>
+          </DetailSection>
+          <ActivitySummarySection
+            emptyText="No outreach or CRM activity has been recorded yet."
+            events={activityTimeline.events}
+            title="Activity"
+            viewAllHref={`/activity?division=${divisionId}`}
+          />
+        </div>
 
         {/* 6. Research evidence and data issues */}
         <aside className="space-y-5">

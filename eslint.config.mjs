@@ -5,7 +5,16 @@ const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
-    ignores: [".next/**", "node_modules/**", "out/**", "build/**", "dist/**"]
+    ignores: [
+      ".frontend-test-dist/**",
+      ".importer-dist/**",
+      ".integration-test-dist/**",
+      ".next/**",
+      "build/**",
+      "dist/**",
+      "node_modules/**",
+      "out/**"
+    ]
   }
 ];
 

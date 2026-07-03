@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".integration-test-dist",
+    "rootDir": ".",
+    "incremental": false,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "next-env.d.ts",
+    "tests/integration/**/*.ts",
+    "lib/crm/**/*.ts",
+    "lib/supabase/**/*.ts"
+  ]
+}

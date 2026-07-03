@@ -1,6 +1,7 @@
+import { ActivitySummarySection } from "@/components/crm/activity-timeline";
 import { StatusBadge } from "@/components/crm/status-badge";
 import { GettingStartedCard } from "@/components/crm/getting-started-card";
-import { formatDate, formatDateTime, formatEnumLabel } from "@/lib/crm/format";
+import { formatDate } from "@/lib/crm/format";
 import type { DashboardSummary } from "@/lib/crm/dashboard-queries";
 import Link from "next/link";
 
@@ -119,6 +120,43 @@ export function DashboardPanels({ summary }: { summary: DashboardSummary }) {
           secondary={`${summary.dueTodayTaskCount} due today · ${summary.overdueTaskCount} overdue`}
           value={summary.openTaskCount}
         />
+      </section>
+
+      <section className="rounded-card border border-border bg-surface p-4 shadow-soft">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-text-heading">Organizations</h2>
+            <p className="mt-1 text-sm text-text-muted">
+              Directory signals for outreach, contact gaps, and overdue follow-up.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Link
+              className="rounded-control border border-border px-3 py-2 font-semibold text-text-body hover:border-border-strong"
+              href="/organizations?activeOutreach=1"
+            >
+              {summary.organizationActiveOutreachCount} active outreach
+            </Link>
+            <Link
+              className="rounded-control border border-border px-3 py-2 font-semibold text-text-body hover:border-border-strong"
+              href="/organizations?primaryContact=none"
+            >
+              {summary.organizationsWithoutPrimaryContactCount} no primary contact
+            </Link>
+            <Link
+              className="rounded-control border border-border px-3 py-2 font-semibold text-text-body hover:border-border-strong"
+              href="/tasks?view=overdue"
+            >
+              {summary.organizationsWithOverdueTasksCount} with overdue tasks
+            </Link>
+            <Link
+              className="rounded-control border border-border px-3 py-2 font-semibold text-text-body hover:border-border-strong"
+              href="/contacts"
+            >
+              Contacts directory
+            </Link>
+          </div>
+        </div>
       </section>
 
       <section className="rounded-card border border-border bg-surface shadow-soft">
@@ -243,43 +281,12 @@ export function DashboardPanels({ summary }: { summary: DashboardSummary }) {
           )}
         </div>
 
-        <div className="rounded-card border border-border bg-surface shadow-soft">
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="text-base font-semibold text-text-heading">Recent activity</h2>
-            <p className="mt-1 text-sm text-text-muted">
-              Recent notes, outreach history, and data imports already recorded.
-            </p>
-          </div>
-          <div className="divide-y divide-border">
-            {summary.recentActivities.map((activity) => (
-              <div className="px-4 py-3" key={activity.id}>
-                <p className="font-medium text-text-body">
-                  {formatEnumLabel(activity.activity_type)}
-                </p>
-                <p className="mt-1 text-sm text-text-muted">
-                  {activity.summary || activity.subject || "Manual CRM activity"} ·{" "}
-                  {formatDateTime(activity.activity_at)}
-                </p>
-              </div>
-            ))}
-            {summary.recentImports.map((batch) => (
-              <div className="px-4 py-3" key={batch.id}>
-                <p className="font-medium text-text-body">
-                  Data import {batch.batchKey ?? batch.id}
-                </p>
-                <p className="mt-1 text-sm text-text-muted">
-                  {formatEnumLabel(batch.mode)} · {formatEnumLabel(batch.status)} ·{" "}
-                  {formatDateTime(batch.completedAt ?? batch.startedAt)}
-                </p>
-              </div>
-            ))}
-            {summary.recentActivities.length === 0 && summary.recentImports.length === 0 ? (
-              <p className="px-4 py-8 text-sm text-text-muted">
-                No recent activity is visible yet.
-              </p>
-            ) : null}
-          </div>
-        </div>
+        <ActivitySummarySection
+          emptyText="No recent activity is visible yet."
+          events={summary.recentActivityEvents}
+          title="Recent activity"
+          viewAllHref="/activity"
+        />
       </section>
 
       <section className="rounded-card border border-border bg-surface p-4 shadow-soft">

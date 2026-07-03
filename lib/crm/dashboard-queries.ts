@@ -1,13 +1,15 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { failOnError, uniqueValues } from "@/lib/crm/query-utils";
+import { failOnError, selectInChunks, uniqueValues } from "@/lib/crm/query-utils";
 import { enrichOpportunityRows, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import { getDashboardTaskSnapshot, type DashboardTaskSnapshot } from "@/lib/crm/task-queries";
+import { getActivityTimeline } from "@/lib/crm/activity-queries";
 import {
   getDashboardDataReviewSnapshot,
   type DashboardDataReviewSnapshot
 } from "@/lib/crm/data-review-queries";
 import { getLocalTodayString } from "@/lib/crm/task-logic";
-import type { ActivityRow, OpportunityListItem } from "@/lib/crm/types";
+import type { ActivityTimelineEvent } from "@/lib/crm/activity-timeline";
+import type { OpportunityListItem } from "@/lib/crm/types";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 export type DashboardSummary = {
@@ -18,16 +20,11 @@ export type DashboardSummary = {
   dueTodayTaskCount: number;
   nextTasks: DashboardTaskSnapshot["nextTasks"];
   openTaskCount: number;
+  organizationActiveOutreachCount: number;
+  organizationsWithOverdueTasksCount: number;
+  organizationsWithoutPrimaryContactCount: number;
   overdueTaskCount: number;
-  recentActivities: ActivityRow[];
-  recentImports: Array<{
-    batchKey: string | null;
-    completedAt: string | null;
-    id: string;
-    mode: string;
-    startedAt: string;
-    status: string;
-  }>;
+  recentActivityEvents: ActivityTimelineEvent[];
   researchAwaitingReviewCount: number;
   tierOneResearch: OpportunityListItem[];
   unresolvedReviewCount: number;
@@ -68,37 +65,6 @@ async function countWaitingApproval(supabase: ServerSupabaseClient) {
   return count ?? 0;
 }
 
-async function getRecentActivities(supabase: ServerSupabaseClient) {
-  const { data, error } = await supabase
-    .from("activities")
-    .select("*")
-    .is("archived_at", null)
-    .order("activity_at", { ascending: false })
-    .limit(6);
-
-  failOnError(error, "Could not load recent activities.");
-  return data ?? [];
-}
-
-async function getRecentImports(supabase: ServerSupabaseClient) {
-  const { data, error } = await supabase
-    .from("import_batches")
-    .select("id,batch_key,import_mode,status,started_at,completed_at")
-    .order("started_at", { ascending: false })
-    .limit(3);
-
-  failOnError(error, "Could not load recent imports.");
-
-  return (data ?? []).map((batch) => ({
-    batchKey: batch.batch_key,
-    completedAt: batch.completed_at,
-    id: batch.id,
-    mode: batch.import_mode,
-    startedAt: batch.started_at,
-    status: batch.status
-  }));
-}
-
 async function getTierOneResearch(supabase: ServerSupabaseClient) {
   const { data: scores, error: scoreError } = await supabase
     .from("imported_research_scores")
@@ -127,8 +93,112 @@ async function getTierOneResearch(supabase: ServerSupabaseClient) {
   return enrichOpportunityRows(supabase, data ?? []);
 }
 
-export async function getDashboardSummary(currentProfileId: string): Promise<DashboardSummary> {
-  if (!hasSupabaseEnv()) {
+async function getDashboardOrganizationSnapshot(
+  supabase: ServerSupabaseClient,
+  today: string
+) {
+  const [
+    organizationsResult,
+    outreachResult,
+    activeOpportunitiesResult,
+    overdueTasksResult
+  ] = await Promise.all([
+    supabase.from("organizations").select("id").is("archived_at", null),
+    supabase
+      .from("organization_outreach")
+      .select("organization_id,primary_contact_role_id"),
+    supabase
+      .from("opportunities")
+      .select("id,primary_organization_id,parent_organization_id")
+      .is("archived_at", null)
+      .eq("research_status", "added_to_pipeline")
+      .neq("pipeline_stage", "research_only"),
+    supabase
+      .from("tasks")
+      .select("organization_id,opportunity_id,venue_id")
+      .is("archived_at", null)
+      .not("status", "in", "(completed,cancelled)")
+      .lt("due_date", today)
+  ]);
+
+  failOnError(organizationsResult.error, "Could not load organization dashboard rows.");
+  failOnError(outreachResult.error, "Could not load organization outreach dashboard rows.");
+  failOnError(activeOpportunitiesResult.error, "Could not load active organization opportunities.");
+  failOnError(overdueTasksResult.error, "Could not load overdue organization tasks.");
+
+  const organizationIds = new Set((organizationsResult.data ?? []).map((row) => row.id));
+  const organizationsWithPrimaryContact = new Set(
+    (outreachResult.data ?? [])
+      .filter((row) => row.primary_contact_role_id && organizationIds.has(row.organization_id))
+      .map((row) => row.organization_id)
+  );
+
+  const activeOutreachOrganizationIds = new Set<string>();
+  for (const opportunity of activeOpportunitiesResult.data ?? []) {
+    if (opportunity.primary_organization_id) {
+      activeOutreachOrganizationIds.add(opportunity.primary_organization_id);
+    }
+    if (opportunity.parent_organization_id) {
+      activeOutreachOrganizationIds.add(opportunity.parent_organization_id);
+    }
+  }
+
+  const overdueTasks = overdueTasksResult.data ?? [];
+  const overdueOpportunityIds = uniqueValues(
+    overdueTasks.map((task) => task.opportunity_id)
+  );
+  const overdueVenueIds = uniqueValues(overdueTasks.map((task) => task.venue_id));
+
+  const [taskOpportunitiesResult, taskVenuesResult] = await Promise.all([
+    selectInChunks(overdueOpportunityIds, (chunk) =>
+      supabase
+        .from("opportunities")
+        .select("id,primary_organization_id,parent_organization_id")
+        .in("id", chunk)
+    ),
+    selectInChunks(overdueVenueIds, (chunk) =>
+      supabase.from("venues").select("id,organization_id").in("id", chunk)
+    )
+  ]);
+
+  failOnError(taskOpportunitiesResult.error, "Could not load overdue task opportunities.");
+  failOnError(taskVenuesResult.error, "Could not load overdue task venues.");
+
+  const opportunitiesById = new Map(
+    (taskOpportunitiesResult.data ?? []).map((opportunity) => [opportunity.id, opportunity])
+  );
+  const venuesById = new Map((taskVenuesResult.data ?? []).map((venue) => [venue.id, venue]));
+  const overdueOrganizationIds = new Set<string>();
+
+  for (const task of overdueTasks) {
+    if (task.organization_id) overdueOrganizationIds.add(task.organization_id);
+
+    const opportunity = task.opportunity_id
+      ? opportunitiesById.get(task.opportunity_id)
+      : null;
+    if (opportunity?.primary_organization_id) {
+      overdueOrganizationIds.add(opportunity.primary_organization_id);
+    }
+    if (opportunity?.parent_organization_id) {
+      overdueOrganizationIds.add(opportunity.parent_organization_id);
+    }
+
+    const venue = task.venue_id ? venuesById.get(task.venue_id) : null;
+    if (venue?.organization_id) overdueOrganizationIds.add(venue.organization_id);
+  }
+
+  return {
+    activeOutreachCount: activeOutreachOrganizationIds.size,
+    withOverdueTasksCount: overdueOrganizationIds.size,
+    withoutPrimaryContactCount: organizationIds.size - organizationsWithPrimaryContact.size
+  };
+}
+
+export async function getDashboardSummary(
+  currentProfileId: string,
+  client?: ServerSupabaseClient
+): Promise<DashboardSummary> {
+  if (!client && !hasSupabaseEnv()) {
     return {
       activePipelineCount: 0,
       dataReviewAssignedToMeCount: 0,
@@ -137,9 +207,11 @@ export async function getDashboardSummary(currentProfileId: string): Promise<Das
       dueTodayTaskCount: 0,
       nextTasks: [],
       openTaskCount: 0,
+      organizationActiveOutreachCount: 0,
+      organizationsWithOverdueTasksCount: 0,
+      organizationsWithoutPrimaryContactCount: 0,
       overdueTaskCount: 0,
-      recentActivities: [],
-      recentImports: [],
+      recentActivityEvents: [],
       researchAwaitingReviewCount: 0,
       tierOneResearch: [],
       unresolvedReviewCount: 0,
@@ -147,7 +219,7 @@ export async function getDashboardSummary(currentProfileId: string): Promise<Das
     };
   }
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = client ?? (await createServerSupabaseClient());
   const today = getLocalTodayString();
 
   const [
@@ -156,19 +228,32 @@ export async function getDashboardSummary(currentProfileId: string): Promise<Das
     taskSnapshot,
     dataReviewSnapshot,
     waitingApprovalCount,
-    recentActivities,
-    recentImports,
-    tierOneResearch
+    recentHumanActivity,
+    tierOneResearch,
+    organizationSnapshot
   ] = await Promise.all([
     countResearch(supabase),
     countActivePipeline(supabase),
     getDashboardTaskSnapshot(supabase, currentProfileId, today),
     getDashboardDataReviewSnapshot(supabase, currentProfileId),
     countWaitingApproval(supabase),
-    getRecentActivities(supabase),
-    getRecentImports(supabase),
-    getTierOneResearch(supabase)
+    getActivityTimeline({
+      client: supabase,
+      filters: { includeSystem: false },
+      limit: 5,
+      scope: { kind: "dashboard" }
+    }),
+    getTierOneResearch(supabase),
+    getDashboardOrganizationSnapshot(supabase, today)
   ]);
+  const recentActivity = recentHumanActivity.events.length > 0
+    ? recentHumanActivity
+    : await getActivityTimeline({
+        client: supabase,
+        filters: { includeSystem: true },
+        limit: 5,
+        scope: { kind: "dashboard" }
+      });
 
   return {
     activePipelineCount,
@@ -178,9 +263,11 @@ export async function getDashboardSummary(currentProfileId: string): Promise<Das
     dueTodayTaskCount: taskSnapshot.dueTodayTaskCount,
     nextTasks: taskSnapshot.nextTasks,
     openTaskCount: taskSnapshot.openTaskCount,
+    organizationActiveOutreachCount: organizationSnapshot.activeOutreachCount,
+    organizationsWithOverdueTasksCount: organizationSnapshot.withOverdueTasksCount,
+    organizationsWithoutPrimaryContactCount: organizationSnapshot.withoutPrimaryContactCount,
     overdueTaskCount: taskSnapshot.overdueTaskCount,
-    recentActivities,
-    recentImports,
+    recentActivityEvents: recentActivity.events,
     researchAwaitingReviewCount,
     tierOneResearch,
     unresolvedReviewCount: dataReviewSnapshot.openIssueCount,

@@ -62,6 +62,8 @@ function revalidateOutreachPaths(organizationId: string) {
   revalidatePath(`/school-outreach/divisions/${organizationId}`);
   revalidatePath(`/school-outreach/schools/${organizationId}`);
   revalidatePath("/school-outreach");
+  revalidatePath(`/organizations/${organizationId}`);
+  revalidatePath("/organizations");
 }
 
 // ── Choose primary / backup contact ──────────────────────────────────────────

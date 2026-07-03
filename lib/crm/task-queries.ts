@@ -1,6 +1,6 @@
 import { formatPipelineStageLabel } from "@/lib/crm/format";
 import { getOpportunityWorkspaceHref } from "@/lib/crm/outreach-labels";
-import { failOnError, stringParam, uniqueValues } from "@/lib/crm/query-utils";
+import { failOnError, selectInChunks, stringParam, uniqueValues } from "@/lib/crm/query-utils";
 import type { ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import {
   deriveTaskTypeKey,
@@ -205,10 +205,9 @@ function toLogicRow(task: TaskRow, organizationName: string | null): TaskLogicRo
 async function getProfilesById(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, ProfileSummary>();
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id,email,display_name")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("profiles").select("id,email,display_name").in("id", chunk)
+  );
 
   failOnError(error, "Could not load task owners.");
   return new Map(
@@ -260,10 +259,9 @@ async function getOrganizationOptions(supabase: ServerSupabaseClient) {
 async function getOrganizationsById(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, TaskOrganizationOption>();
 
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("id,name,organization_type,status,city")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("organizations").select("id,name,organization_type,status,city").in("id", chunk)
+  );
 
   failOnError(error, "Could not load related organizations.");
   return new Map(
@@ -304,12 +302,14 @@ async function getOpportunityOptions(supabase: ServerSupabaseClient) {
 async function getOpportunitiesById(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, TaskOpportunitySummary>();
 
-  const { data, error } = await supabase
-    .from("opportunities")
-    .select(
-      "id,opportunity_name,opportunity_type,primary_organization_id,parent_organization_id,pipeline_stage"
-    )
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase
+      .from("opportunities")
+      .select(
+        "id,opportunity_name,opportunity_type,primary_organization_id,parent_organization_id,pipeline_stage"
+      )
+      .in("id", chunk)
+  );
 
   failOnError(error, "Could not load related opportunities.");
   return new Map(
@@ -331,10 +331,9 @@ async function getOpportunitiesById(supabase: ServerSupabaseClient, ids: string[
 async function getActivitiesById(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, TaskActivitySummary>();
 
-  const { data, error } = await supabase
-    .from("activities")
-    .select("id,activity_type,direction,activity_at")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("activities").select("id,activity_type,direction,activity_at").in("id", chunk)
+  );
 
   failOnError(error, "Could not load related activities.");
   return new Map(
@@ -373,36 +372,28 @@ async function buildContactOptions(
 
   const [peopleResult, departmentsResult, roleMethodsResult, personMethodsResult, departmentMethodsResult] =
     await Promise.all([
-      personIds.length
-        ? supabase.from("people").select("id,first_name,last_name").in("id", personIds)
-        : Promise.resolve({ data: [], error: null }),
-      departmentIds.length
-        ? supabase
-            .from("departmental_contacts")
-            .select("id,display_name,department,organization_id")
-            .in("id", departmentIds)
-        : Promise.resolve({ data: [], error: null }),
-      roleIds.length
-        ? supabase
-            .from("contact_methods")
-            .select("*")
-            .in("contact_role_id", roleIds)
-            .is("archived_at", null)
-        : Promise.resolve({ data: [], error: null }),
-      personIds.length
-        ? supabase
-            .from("contact_methods")
-            .select("*")
-            .in("person_id", personIds)
-            .is("archived_at", null)
-        : Promise.resolve({ data: [], error: null }),
-      departmentIds.length
-        ? supabase
-            .from("contact_methods")
-            .select("*")
-            .in("departmental_contact_id", departmentIds)
-            .is("archived_at", null)
-        : Promise.resolve({ data: [], error: null })
+      selectInChunks(personIds, (chunk) =>
+        supabase.from("people").select("id,first_name,last_name").in("id", chunk)
+      ),
+      selectInChunks(departmentIds, (chunk) =>
+        supabase
+          .from("departmental_contacts")
+          .select("id,display_name,department,organization_id")
+          .in("id", chunk)
+      ),
+      selectInChunks(roleIds, (chunk) =>
+        supabase.from("contact_methods").select("*").in("contact_role_id", chunk).is("archived_at", null)
+      ),
+      selectInChunks(personIds, (chunk) =>
+        supabase.from("contact_methods").select("*").in("person_id", chunk).is("archived_at", null)
+      ),
+      selectInChunks(departmentIds, (chunk) =>
+        supabase
+          .from("contact_methods")
+          .select("*")
+          .in("departmental_contact_id", chunk)
+          .is("archived_at", null)
+      )
     ]);
 
   failOnError(peopleResult.error, "Could not load named contacts.");
@@ -471,10 +462,9 @@ async function getContactOptions(supabase: ServerSupabaseClient) {
 async function getContactsById(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, TaskContactOption>();
 
-  const { data, error } = await supabase
-    .from("contact_roles")
-    .select("*")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("contact_roles").select("*").in("id", chunk)
+  );
 
   failOnError(error, "Could not load task contacts.");
   const contacts = await buildContactOptions(supabase, data ?? []);
@@ -664,13 +654,14 @@ async function getTaskRows(supabase: ServerSupabaseClient) {
 
 export async function getTaskWorkspaceData(
   filters: TaskFilters,
-  currentProfileId: string
+  currentProfileId: string,
+  client?: ServerSupabaseClient
 ): Promise<TaskWorkspaceData> {
-  if (!hasSupabaseEnv()) {
+  if (!client && !hasSupabaseEnv()) {
     return emptyWorkspace(filters);
   }
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = client ?? (await createServerSupabaseClient());
   const today = getLocalTodayString();
   const [taskRows, ownerOptions, organizationOptions, opportunityOptions, contactOptions] =
     await Promise.all([

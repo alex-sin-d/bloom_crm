@@ -1,6 +1,12 @@
 import { formatEnumLabel } from "@/lib/crm/format";
 import { getOpportunityWorkspaceHref } from "@/lib/crm/outreach-labels";
-import { failOnError, numberParam, stringParam, uniqueValues } from "@/lib/crm/query-utils";
+import {
+  failOnError,
+  numberParam,
+  selectInChunks,
+  stringParam,
+  uniqueValues
+} from "@/lib/crm/query-utils";
 import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import type { ProfileSummary } from "@/lib/crm/types";
 import {
@@ -225,10 +231,9 @@ async function getOwnerOptions(supabase: ServerSupabaseClient) {
 async function getProfilesById(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, ProfileSummary>();
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id,email,display_name")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("profiles").select("id,email,display_name").in("id", chunk)
+  );
 
   failOnError(error, "Could not load review profiles.");
   return new Map(
@@ -255,14 +260,18 @@ async function getRecordTypeMap(supabase: ServerSupabaseClient) {
 
 async function getFieldConflictsById(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, FieldConflictRow>();
-  const { data, error } = await supabase.from("field_conflicts").select("*").in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("field_conflicts").select("*").in("id", chunk)
+  );
   failOnError(error, "Could not load field conflicts.");
   return new Map((data ?? []).map((row) => [row.id, row]));
 }
 
 async function getDuplicateCandidatesById(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, DuplicateCandidateRow>();
-  const { data, error } = await supabase.from("duplicate_candidates").select("*").in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("duplicate_candidates").select("*").in("id", chunk)
+  );
   failOnError(error, "Could not load duplicate candidates.");
   return new Map((data ?? []).map((row) => [row.id, row]));
 }
@@ -274,10 +283,9 @@ async function getDuplicateRecordsByCandidateId(
   const grouped = new Map<string, DuplicateCandidateRecordRow[]>();
   if (ids.length === 0) return grouped;
 
-  const { data, error } = await supabase
-    .from("duplicate_candidate_records")
-    .select("*")
-    .in("duplicate_candidate_id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("duplicate_candidate_records").select("*").in("duplicate_candidate_id", chunk)
+  );
 
   failOnError(error, "Could not load duplicate records.");
   for (const row of data ?? []) {
@@ -294,10 +302,9 @@ async function getUnresolvedRelationshipsById(
   ids: string[]
 ) {
   if (ids.length === 0) return new Map<string, UnresolvedRelationshipRow>();
-  const { data, error } = await supabase
-    .from("unresolved_relationships")
-    .select("*")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("unresolved_relationships").select("*").in("id", chunk)
+  );
   failOnError(error, "Could not load unresolved relationships.");
   return new Map((data ?? []).map((row) => [row.id, row]));
 }
@@ -305,19 +312,18 @@ async function getUnresolvedRelationshipsById(
 async function getSourceSummariesByRowId(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, DataReviewSourceSummary>();
 
-  const { data: rows, error: rowError } = await supabase
-    .from("source_rows")
-    .select("id,source_file_id,source_row_number,original_record_id,created_at")
-    .in("id", ids);
+  const { data: rows, error: rowError } = await selectInChunks(ids, (chunk) =>
+    supabase
+      .from("source_rows")
+      .select("id,source_file_id,source_row_number,original_record_id,created_at")
+      .in("id", chunk)
+  );
 
   failOnError(rowError, "Could not load source rows.");
   const fileIds = uniqueValues((rows ?? []).map((row) => row.source_file_id));
-  const { data: files, error: fileError } = fileIds.length
-    ? await supabase
-        .from("source_files")
-        .select("id,phase_folder,relative_csv_path")
-        .in("id", fileIds)
-    : { data: [], error: null };
+  const { data: files, error: fileError } = await selectInChunks(fileIds, (chunk) =>
+    supabase.from("source_files").select("id,phase_folder,relative_csv_path").in("id", chunk)
+  );
 
   failOnError(fileError, "Could not load source files.");
   const fileMap = new Map((files ?? []).map((file) => [file.id, file]));
@@ -379,10 +385,9 @@ async function summarizeOrganizations(
   ids: string[]
 ) {
   if (ids.length === 0) return new Map<string, DataReviewRecordSummary>();
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("id,name,organization_type,city")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("organizations").select("id,name,organization_type,city").in("id", chunk)
+  );
   failOnError(error, "Could not load affected organizations.");
 
   return new Map(
@@ -417,10 +422,12 @@ async function summarizeOrganizations(
 
 async function summarizeEvents(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, DataReviewRecordSummary>();
-  const { data, error } = await supabase
-    .from("events")
-    .select("id,event_name,event_type,event_year,organization_id,parent_organization_id")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase
+      .from("events")
+      .select("id,event_name,event_type,event_year,organization_id,parent_organization_id")
+      .in("id", chunk)
+  );
   failOnError(error, "Could not load affected events.");
 
   const orgMap = await summarizeOrganizations(
@@ -450,10 +457,9 @@ async function summarizeEvents(supabase: ServerSupabaseClient, ids: string[]) {
 
 async function summarizeVenues(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, DataReviewRecordSummary>();
-  const { data, error } = await supabase
-    .from("venues")
-    .select("id,organization_id,city")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("venues").select("id,organization_id,city").in("id", chunk)
+  );
   failOnError(error, "Could not load affected venues.");
 
   const orgMap = await summarizeOrganizations(
@@ -486,10 +492,12 @@ async function summarizeOpportunities(
   ids: string[]
 ) {
   if (ids.length === 0) return new Map<string, DataReviewRecordSummary>();
-  const { data, error } = await supabase
-    .from("opportunities")
-    .select("id,opportunity_name,opportunity_type,primary_organization_id,parent_organization_id")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase
+      .from("opportunities")
+      .select("id,opportunity_name,opportunity_type,primary_organization_id,parent_organization_id")
+      .in("id", chunk)
+  );
   failOnError(error, "Could not load affected opportunities.");
 
   const orgMap = await summarizeOrganizations(
@@ -527,10 +535,9 @@ async function summarizeOpportunities(
 
 async function summarizePeople(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, DataReviewRecordSummary>();
-  const { data, error } = await supabase
-    .from("people")
-    .select("id,first_name,last_name")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase.from("people").select("id,first_name,last_name").in("id", chunk)
+  );
   failOnError(error, "Could not load affected people.");
   return new Map(
     (data ?? []).map((person) => [
@@ -554,10 +561,12 @@ async function summarizeDepartmentalContacts(
   ids: string[]
 ) {
   if (ids.length === 0) return new Map<string, DataReviewRecordSummary>();
-  const { data, error } = await supabase
-    .from("departmental_contacts")
-    .select("id,display_name,department,organization_id")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase
+      .from("departmental_contacts")
+      .select("id,display_name,department,organization_id")
+      .in("id", chunk)
+  );
   failOnError(error, "Could not load affected departmental contacts.");
 
   const orgMap = await summarizeOrganizations(
@@ -587,10 +596,12 @@ async function summarizeDepartmentalContacts(
 
 async function summarizeContactRoles(supabase: ServerSupabaseClient, ids: string[]) {
   if (ids.length === 0) return new Map<string, DataReviewRecordSummary>();
-  const { data, error } = await supabase
-    .from("contact_roles")
-    .select("id,person_id,departmental_contact_id,organization_id,role_title,contact_category")
-    .in("id", ids);
+  const { data, error } = await selectInChunks(ids, (chunk) =>
+    supabase
+      .from("contact_roles")
+      .select("id,person_id,departmental_contact_id,organization_id,role_title,contact_category")
+      .in("id", chunk)
+  );
   failOnError(error, "Could not load affected contacts.");
 
   const [peopleMap, deptMap, orgMap] = await Promise.all([
@@ -993,11 +1004,12 @@ function recordTypeOptions(rows: DataReviewItem[]) {
 
 export async function getDataReviewWorkspaceData(
   filters: DataReviewFilters,
-  currentProfileId: string
+  currentProfileId: string,
+  client?: ServerSupabaseClient
 ): Promise<DataReviewWorkspaceData> {
-  if (!hasSupabaseEnv()) return emptyWorkspace(filters);
+  if (!client && !hasSupabaseEnv()) return emptyWorkspace(filters);
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = client ?? (await createServerSupabaseClient());
   const [ownerOptions, rows] = await Promise.all([getOwnerOptions(supabase), loadRows(supabase)]);
   const { items } = await enrichReviewItems(supabase, rows, filters.selectedId);
   const summary = getDataReviewSummaryCounts(items, currentProfileId);
