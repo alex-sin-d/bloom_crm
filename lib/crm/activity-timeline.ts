@@ -3,12 +3,14 @@ import type {
   AuditLogRow,
   CrmEnums,
   DataReviewItemRow,
+  EventRow,
   OrganizationOutreachRow,
   OrganizationRelationshipRow,
   OpportunityRow,
   OrganizationRow,
   ProfileSummary,
-  TaskRow
+  TaskRow,
+  VenueRow
 } from "./types.js";
 import type { Database, Json } from "../supabase/database.types.js";
 
@@ -16,6 +18,7 @@ export const ACTIVITY_TIMELINE_CATEGORIES = [
   "outreach",
   "tasks",
   "opportunities",
+  "events",
   "contacts",
   "organization_changes",
   "data_review",
@@ -53,6 +56,7 @@ export type ActivityTimelineEvent = {
   organization: ActivityTimelineRelatedRecord | null;
   relatedContactRoleIds: string[];
   relatedDepartmentalContactIds: string[];
+  relatedEventIds: string[];
   relatedOrganizationIds: string[];
   relatedOpportunityIds: string[];
   relatedPersonIds: string[];
@@ -80,6 +84,7 @@ export type ActivityTimelineFilters = {
   organizationId?: string;
   contactRoleId?: string;
   departmentalContactId?: string;
+  eventId?: string;
   personId?: string;
   q?: string;
   schoolDivisionId?: string;
@@ -91,6 +96,7 @@ export type ActivityTimelineScope =
   | { kind: "dashboard" | "global" }
   | { kind: "contactRole"; contactRoleId: string }
   | { kind: "department"; departmentalContactId: string }
+  | { kind: "event"; eventId: string }
   | { kind: "division" | "organization" | "school"; organizationId: string }
   | { kind: "opportunity"; opportunityId: string }
   | { kind: "person"; personId: string };
@@ -122,11 +128,13 @@ export type TimelineContactRole = Pick<
   | "created_by"
   | "department"
   | "departmental_contact_id"
+  | "event_id"
   | "id"
   | "organization_id"
   | "opportunity_id"
   | "person_id"
   | "role_title"
+  | "venue_id"
 >;
 
 export type TimelineImportBatch = Pick<
@@ -138,6 +146,7 @@ export type TimelineMaps = {
   contactLabelsById: Map<string, string>;
   contactRolesById: Map<string, TimelineContactRole>;
   dataReviewItemsById: Map<string, DataReviewItemRow>;
+  eventsById: Map<string, EventRow>;
   opportunitiesById: Map<string, OpportunityRow>;
   organizationsById: Map<string, OrganizationRow>;
   outreachById: Map<string, OrganizationOutreachRow>;
@@ -145,6 +154,7 @@ export type TimelineMaps = {
   recordTypeById: Map<string, string>;
   relationshipsById: Map<string, OrganizationRelationshipRow>;
   tasksById: Map<string, TaskRow>;
+  venuesById: Map<string, VenueRow>;
 };
 
 type DraftEvent = Omit<
@@ -157,6 +167,7 @@ type DraftEvent = Omit<
   | "organization"
   | "relatedContactRoleIds"
   | "relatedDepartmentalContactIds"
+  | "relatedEventIds"
   | "relatedPersonIds"
   | "searchText"
   | "technicalDetails"
@@ -169,6 +180,7 @@ type DraftEvent = Omit<
   organizationId?: string | null;
   relatedContactRoleIds?: string[];
   relatedDepartmentalContactIds?: string[];
+  relatedEventIds?: string[];
   relatedPersonIds?: string[];
   searchParts: Array<string | null | undefined>;
   technicalDetails?: ActivityTimelineDetail[];
@@ -180,12 +192,17 @@ const SOURCE_RANKS: Record<string, number> = {
   tasks: 30,
   contact_roles: 40,
   opportunities: 50,
+  events: 60,
+  event_planning_details: 61,
+  event_product_planning: 62,
+  event_staff_assignments: 63,
   import_batches: 90
 };
 
 const CATEGORY_LABELS: Record<ActivityTimelineCategory, string> = {
   contacts: "Contacts",
   data_review: "Data review",
+  events: "Events",
   opportunities: "Opportunities",
   organization_changes: "Organization changes",
   outreach: "Outreach",
@@ -202,6 +219,12 @@ const FIELD_LABELS: Record<string, string> = {
   city: "City",
   due_at: "Due time",
   due_date: "Due date",
+  event_confirmation_status: "Event status",
+  event_date: "Event date",
+  event_time: "Event time",
+  event_type: "Event type",
+  event_year: "Event year",
+  external_staff_notes: "External staff notes",
   internal_notes: "Internal notes",
   name: "Name",
   organization_type: "Organization type",
@@ -209,10 +232,16 @@ const FIELD_LABELS: Record<string, string> = {
   outreach_status: "Outreach status",
   pipeline_stage: "Pipeline stage",
   postal_code: "Postal code",
+  product_name: "Product",
   primary_contact_role_id: "Primary contact",
   province: "Province",
+  required_staff_count: "Required staff count",
   review_status: "Review status",
+  sales_close_time: "Sales close time",
+  sales_open_time: "Sales open time",
+  setup_access_time: "Setup access time",
   status: "Status",
+  venue_id: "Venue",
   website: "Website"
 };
 
@@ -256,6 +285,7 @@ export function parseActivityTimelineSearch(
     includeSystem: read("includeSystem") === "1",
     contactRoleId: read("contactRole"),
     departmentalContactId: read("department"),
+    eventId: read("event"),
     organizationId: read("organization"),
     personId: read("person"),
     q: read("q"),
@@ -332,6 +362,7 @@ export function filterTimelineEvents(
         !filters.departmentalContactId ||
         event.relatedDepartmentalContactIds.includes(filters.departmentalContactId)
     )
+    .filter((event) => !filters.eventId || event.relatedEventIds.includes(filters.eventId))
     .filter((event) => !filters.organizationId || event.relatedOrganizationIds.includes(filters.organizationId))
     .filter((event) => !filters.personId || event.relatedPersonIds.includes(filters.personId))
     .filter((event) => !filters.schoolDivisionId || event.relatedOrganizationIds.includes(filters.schoolDivisionId))
@@ -384,6 +415,10 @@ export function buildActivityEvent(activity: ActivityRow, maps: TimelineMaps): A
     ],
     id: `activities:${activity.id}`,
     occurredAt: activity.activity_at,
+    relatedEventIds: uniqueValues([
+      maps.contactRolesById.get(activity.contact_role_id ?? "")?.event_id,
+      ...getOpportunityEventIds(activity.opportunity_id, maps)
+    ]),
     relatedOpportunityIds: uniqueValues([activity.opportunity_id]),
     relatedOrganizationIds: organizationIds,
     relatedTaskIds: [],
@@ -417,6 +452,7 @@ export function buildTaskFallbackEvent(task: TaskRow, maps: TimelineMaps): Activ
     href: taskHref(task),
     id: `tasks:${task.id}`,
     occurredAt: task.created_at,
+    relatedEventIds: uniqueValues([task.event_id, ...getOpportunityEventIds(task.opportunity_id, maps)]),
     relatedOpportunityIds: uniqueValues([task.opportunity_id]),
     relatedOrganizationIds: organizationIds,
     relatedTaskIds: [task.id],
@@ -444,6 +480,7 @@ export function buildOpportunityFallbackEvent(opportunity: OpportunityRow, maps:
     href: opportunityHref(opportunity),
     id: `opportunities:${opportunity.id}:activation`,
     occurredAt: opportunity.added_to_pipeline_at,
+    relatedEventIds: uniqueValues([opportunity.related_event_id]),
     relatedOpportunityIds: [opportunity.id],
     relatedOrganizationIds: getOpportunityOrganizationIds(opportunity.id, maps),
     relatedTaskIds: [],
@@ -475,6 +512,7 @@ export function buildContactAddedEvent(contactRole: TimelineContactRole, maps: T
     ],
     id: `contact_roles:${contactRole.id}`,
     occurredAt: contactRole.created_at,
+    relatedEventIds: uniqueValues([contactRole.event_id]),
     relatedOpportunityIds: uniqueValues([contactRole.opportunity_id]),
     relatedOrganizationIds: organizationIds,
     relatedTaskIds: [],
@@ -502,6 +540,7 @@ export function buildImportEvent(batch: TimelineImportBatch, maps: TimelineMaps)
     ],
     id: `import_batches:${batch.id}`,
     occurredAt,
+    relatedEventIds: [],
     relatedOpportunityIds: [],
     relatedOrganizationIds: [],
     relatedTaskIds: [],
@@ -520,6 +559,14 @@ export function buildAuditEvent(audit: AuditLogRow, maps: TimelineMaps): Activit
 
   if (tableName === "organization_outreach") return buildOutreachAuditEvent(audit, maps);
   if (
+    tableName === "events" ||
+    tableName === "event_planning_details" ||
+    tableName === "event_product_planning" ||
+    tableName === "event_staff_assignments"
+  ) {
+    return buildEventAuditEvent(audit, maps, tableName);
+  }
+  if (
     tableName === "contact_methods" ||
     tableName === "contact_roles" ||
     tableName === "departmental_contacts" ||
@@ -533,6 +580,70 @@ export function buildAuditEvent(audit: AuditLogRow, maps: TimelineMaps): Activit
   if (tableName === "organization_relationships") return buildRelationshipAuditEvent(audit, maps);
   if (tableName === "data_review_items") return buildDataReviewAuditEvent(audit, maps);
   return null;
+}
+
+function buildEventAuditEvent(
+  audit: AuditLogRow,
+  maps: TimelineMaps,
+  tableName: string
+): ActivityTimelineEvent | null {
+  const eventId =
+    tableName === "events"
+      ? audit.record_id
+      : stringValue(audit.after_value, "event_id") ?? stringValue(audit.before_value, "event_id");
+  if (!eventId) return null;
+  const event = maps.eventsById.get(eventId);
+  const fieldName = audit.field_name ?? "";
+  const title = eventAuditTitle(tableName, audit.action_type, fieldName);
+  const draft: DraftEvent = {
+    actorId: audit.user_id,
+    category: "events",
+    dedupeKey: `event:${tableName}:${audit.record_id}:${audit.action_type}:${fieldName || "record"}:${audit.id}`,
+    descriptionParts: [title, event?.event_name],
+    detailParts: [
+      detail("Field changed", fieldName ? FIELD_LABELS[fieldName] ?? formatEnumLabel(fieldName) : null),
+      detail("Previous", displayAuditValue(fieldName, stringValue(audit.before_value, fieldName), maps)),
+      detail("New", displayAuditValue(fieldName, stringValue(audit.after_value, fieldName), maps)),
+      detail("Reason", audit.reason)
+    ],
+    href: `/events/${eventId}`,
+    id: `audit_log:${audit.id}`,
+    occurredAt: audit.created_at,
+    relatedEventIds: [eventId],
+    relatedOpportunityIds: [],
+    relatedOrganizationIds: getEventOrganizationIds(eventId, maps),
+    relatedTaskIds: [],
+    searchParts: [title, event?.event_name, audit.reason, fieldName],
+    source: "audit_log",
+    sourceId: audit.id,
+    sourceRank: SOURCE_RANKS.audit_log,
+    title
+  };
+  return finalizeEvent(draft, maps);
+}
+
+function eventAuditTitle(
+  tableName: string,
+  actionType: CrmEnums["audit_action_type"],
+  fieldName: string
+) {
+  if (tableName === "events") {
+    if (actionType === "create") return "Event created";
+    if (actionType === "archive") return "Event archived";
+    if (fieldName === "event_date" || fieldName === "event_time" || fieldName === "date_status") {
+      return "Event schedule changed";
+    }
+    if (fieldName === "venue_id") return "Event venue changed";
+    if (fieldName === "event_confirmation_status") return "Event status changed";
+    return "Event information updated";
+  }
+  if (tableName === "event_product_planning") {
+    return actionType === "create" ? "Event product planning added" : "Event product planning updated";
+  }
+  if (tableName === "event_staff_assignments") {
+    return actionType === "create" ? "Event staff assigned" : "Event staffing updated";
+  }
+  return "Event planning updated";
 }
 
 function buildContactAuditEvent(
@@ -598,6 +709,7 @@ function buildContactAuditEvent(
     occurredAt: audit.created_at,
     relatedContactRoleIds: uniqueValues([contactRoleId]),
     relatedDepartmentalContactIds: uniqueValues([departmentalContactId]),
+    relatedEventIds: uniqueValues([role?.event_id, stringValue(audit.after_value, "event_id"), stringValue(audit.before_value, "event_id")]),
     relatedOpportunityIds: uniqueValues([role?.opportunity_id]),
     relatedOrganizationIds: organizationIds,
     relatedPersonIds: uniqueValues([personId]),
@@ -645,6 +757,7 @@ function buildOutreachAuditEvent(audit: AuditLogRow, maps: TimelineMaps): Activi
     ],
     id: `audit_log:${audit.id}`,
     occurredAt: audit.created_at,
+    relatedEventIds: uniqueValues([maps.contactRolesById.get(contactRoleId ?? "")?.event_id]),
     relatedOpportunityIds: [],
     relatedOrganizationIds: organizationIds,
     relatedTaskIds: [],
@@ -699,6 +812,7 @@ function buildTaskAuditEvent(audit: AuditLogRow, maps: TimelineMaps): ActivityTi
     href: taskHref(task),
     id: `audit_log:${audit.id}`,
     occurredAt: audit.created_at,
+    relatedEventIds: uniqueValues([task.event_id, ...getOpportunityEventIds(task.opportunity_id, maps)]),
     relatedOpportunityIds: uniqueValues([task.opportunity_id]),
     relatedOrganizationIds: organizationIds,
     relatedTaskIds: [task.id],
@@ -729,6 +843,7 @@ function buildOpportunityAuditEvent(audit: AuditLogRow, maps: TimelineMaps): Act
     href: opportunityHref(opportunity),
     id: `audit_log:${audit.id}`,
     occurredAt: audit.created_at,
+    relatedEventIds: uniqueValues([opportunity.related_event_id]),
     relatedOpportunityIds: [opportunity.id],
     relatedOrganizationIds: getOpportunityOrganizationIds(opportunity.id, maps),
     relatedTaskIds: [],
@@ -764,6 +879,7 @@ function buildOrganizationAuditEvent(audit: AuditLogRow, maps: TimelineMaps): Ac
     ],
     id: `audit_log:${audit.id}`,
     occurredAt: audit.created_at,
+    relatedEventIds: [],
     relatedOpportunityIds: [],
     relatedOrganizationIds: [audit.record_id],
     relatedTaskIds: [],
@@ -796,6 +912,7 @@ function buildRelationshipAuditEvent(audit: AuditLogRow, maps: TimelineMaps): Ac
     ],
     id: `audit_log:${audit.id}`,
     occurredAt: audit.created_at,
+    relatedEventIds: [],
     relatedOpportunityIds: [],
     relatedOrganizationIds: uniqueValues([
       relationship.parent_organization_id,
@@ -840,6 +957,7 @@ function buildDataReviewAuditEvent(audit: AuditLogRow, maps: TimelineMaps): Acti
     relatedContactRoleIds: item?.record_id && recordTable === "contact_roles" ? [item.record_id] : [],
     relatedDepartmentalContactIds:
       item?.record_id && recordTable === "departmental_contacts" ? [item.record_id] : [],
+    relatedEventIds: item?.record_id && recordTable === "events" ? [item.record_id] : [],
     relatedOpportunityIds: item?.record_id && recordTable === "opportunities" ? [item.record_id] : [],
     relatedOrganizationIds: organizationIds,
     relatedPersonIds: item?.record_id && recordTable === "people" ? [item.record_id] : [],
@@ -869,6 +987,11 @@ function finalizeEvent(
   const relatedDepartmentalContactIds = uniqueValues([
     ...(draft.relatedDepartmentalContactIds ?? []),
     ...relatedContactRoleIds.map((id) => maps.contactRolesById.get(id)?.departmental_contact_id)
+  ]);
+  const relatedEventIds = uniqueValues([
+    ...(draft.relatedEventIds ?? []),
+    ...relatedContactRoleIds.map((id) => maps.contactRolesById.get(id)?.event_id),
+    ...draft.relatedOpportunityIds.map((id) => maps.opportunitiesById.get(id)?.related_event_id)
   ]);
   const organization = getPrimaryOrganization(draft.relatedOrganizationIds, maps);
   const contact = draft.contactRoleId ? contactRecord(draft.contactRoleId, maps) : null;
@@ -901,6 +1024,7 @@ function finalizeEvent(
     organization,
     relatedContactRoleIds,
     relatedDepartmentalContactIds,
+    relatedEventIds,
     relatedOrganizationIds: draft.relatedOrganizationIds,
     relatedOpportunityIds: draft.relatedOpportunityIds,
     relatedPersonIds,
@@ -1067,6 +1191,12 @@ function displayValue(fieldName: string, value: string | null) {
 
 function displayAuditValue(fieldName: string, value: string | null, maps: TimelineMaps) {
   if (!value) return null;
+  if (fieldName === "venue_id") {
+    return venueLabel(value, maps);
+  }
+  if (fieldName === "event_id") {
+    return maps.eventsById.get(value)?.event_name ?? "Unknown event";
+  }
   if (fieldName.includes("contact_role_id")) {
     return maps.contactLabelsById.get(value) ?? "Unknown contact";
   }
@@ -1133,6 +1263,23 @@ function contactRecord(contactRoleId: string, maps: TimelineMaps): ActivityTimel
 function getOpportunityOrganizationIds(opportunityId: string | null | undefined, maps: TimelineMaps) {
   const opportunity = opportunityId ? maps.opportunitiesById.get(opportunityId) : null;
   return uniqueValues([opportunity?.primary_organization_id, opportunity?.parent_organization_id]);
+}
+
+function getOpportunityEventIds(opportunityId: string | null | undefined, maps: TimelineMaps) {
+  const opportunity = opportunityId ? maps.opportunitiesById.get(opportunityId) : null;
+  return uniqueValues([opportunity?.related_event_id]);
+}
+
+function getEventOrganizationIds(eventId: string | null | undefined, maps: TimelineMaps) {
+  const event = eventId ? maps.eventsById.get(eventId) : null;
+  const venue = event?.venue_id ? maps.venuesById.get(event.venue_id) : null;
+  return uniqueValues([event?.organization_id, event?.parent_organization_id, venue?.organization_id]);
+}
+
+function venueLabel(venueId: string, maps: TimelineMaps) {
+  const venue = maps.venuesById.get(venueId);
+  if (!venue) return "Unknown venue";
+  return maps.organizationsById.get(venue.organization_id)?.name ?? "Venue";
 }
 
 function opportunityHref(opportunity: OpportunityRow) {

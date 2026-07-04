@@ -24,10 +24,12 @@ export type CreateManualTaskInput = {
   contactRoleId: string | null;
   dueDate: string;
   dueTime: string | null;
+  eventId?: string | null;
   note: string | null;
   opportunityId: string | null;
   organizationId: string | null;
   title: string;
+  venueId?: string | null;
 };
 
 export type AssignTaskInput = {
@@ -129,16 +131,22 @@ async function normalizeTaskLinks(
   supabase: ServerSupabaseClient,
   {
     contactRoleId,
+    eventId,
     opportunityId,
-    organizationId
+    organizationId,
+    venueId
   }: {
     contactRoleId: string | null;
+    eventId?: string | null;
     opportunityId: string | null;
     organizationId: string | null;
+    venueId?: string | null;
   }
 ) {
+  let normalizedEventId = eventId ?? null;
   let normalizedOrganizationId = organizationId;
   let normalizedOpportunityId = opportunityId;
+  let normalizedVenueId = venueId ?? null;
   const normalizedContactRoleId = contactRoleId;
 
   if (normalizedOrganizationId) {
@@ -154,7 +162,7 @@ async function normalizeTaskLinks(
   if (normalizedOpportunityId) {
     const { data, error } = await supabase
       .from("opportunities")
-      .select("id,primary_organization_id,parent_organization_id")
+      .select("id,primary_organization_id,parent_organization_id,related_event_id,related_venue_id")
       .eq("id", normalizedOpportunityId)
       .is("archived_at", null)
       .maybeSingle();
@@ -170,12 +178,43 @@ async function normalizeTaskLinks(
     }
 
     normalizedOrganizationId = normalizedOrganizationId ?? data.primary_organization_id;
+    normalizedEventId = normalizedEventId ?? data.related_event_id;
+    normalizedVenueId = normalizedVenueId ?? data.related_venue_id;
+  }
+
+  if (normalizedEventId) {
+    const { data, error } = await supabase
+      .from("events")
+      .select("id,organization_id,venue_id")
+      .eq("id", normalizedEventId)
+      .is("archived_at", null)
+      .maybeSingle();
+
+    if (error || !data) throw new Error("Selected event was not found.");
+
+    if (normalizedOrganizationId && data.organization_id !== normalizedOrganizationId) {
+      throw new Error("Selected event is not related to the selected organization.");
+    }
+
+    normalizedOrganizationId = normalizedOrganizationId ?? data.organization_id;
+    normalizedVenueId = normalizedVenueId ?? data.venue_id;
+  }
+
+  if (normalizedVenueId) {
+    const { data, error } = await supabase
+      .from("venues")
+      .select("id")
+      .eq("id", normalizedVenueId)
+      .is("archived_at", null)
+      .maybeSingle();
+
+    if (error || !data) throw new Error("Selected venue was not found.");
   }
 
   if (normalizedContactRoleId) {
     const { data, error } = await supabase
       .from("contact_roles")
-      .select("id,organization_id,opportunity_id,departmental_contact_id")
+      .select("id,organization_id,event_id,venue_id,opportunity_id,departmental_contact_id")
       .eq("id", normalizedContactRoleId)
       .is("archived_at", null)
       .maybeSingle();
@@ -205,18 +244,32 @@ async function normalizeTaskLinks(
     if (!normalizedOpportunityId && data.opportunity_id) {
       normalizedOpportunityId = data.opportunity_id;
     }
+
+    if (!normalizedEventId && data.event_id) {
+      normalizedEventId = data.event_id;
+    }
+
+    if (!normalizedVenueId && data.venue_id) {
+      normalizedVenueId = data.venue_id;
+    }
   }
 
   return {
     contactRoleId: normalizedContactRoleId,
+    eventId: normalizedEventId,
     opportunityId: normalizedOpportunityId,
-    organizationId: normalizedOrganizationId
+    organizationId: normalizedOrganizationId,
+    venueId: normalizedVenueId
   };
 }
 
-function revalidateTaskPaths(task: Pick<TaskRow, "opportunity_id" | "organization_id">) {
+function revalidateTaskPaths(task: Pick<TaskRow, "event_id" | "opportunity_id" | "organization_id">) {
   revalidatePath("/tasks");
   revalidatePath("/dashboard");
+  revalidatePath("/events");
+  if (task.event_id) {
+    revalidatePath(`/events/${task.event_id}`);
+  }
   if (task.opportunity_id) {
     revalidatePath(`/opportunities/${task.opportunity_id}`);
   }
@@ -246,8 +299,10 @@ export async function createManualTask(
     );
     const links = await normalizeTaskLinks(supabase, {
       contactRoleId: cleanId(input.contactRoleId),
+      eventId: cleanId(input.eventId),
       opportunityId: cleanId(input.opportunityId),
-      organizationId: cleanId(input.organizationId)
+      organizationId: cleanId(input.organizationId),
+      venueId: cleanId(input.venueId)
     });
 
     const insertPayload: TaskInsert = {
@@ -256,19 +311,21 @@ export async function createManualTask(
       created_by: profile.id,
       due_at: buildDueAtIso(dueDate, input.dueTime),
       due_date: dueDate,
+      event_id: links.eventId,
       notes: cleanText(input.note),
       opportunity_id: links.opportunityId,
       organization_id: links.organizationId,
       priority: "medium",
       status: "open",
       task_kind: "custom",
-      title
+      title,
+      venue_id: links.venueId
     };
 
     const { data, error } = await supabase
       .from("tasks")
       .insert(insertPayload)
-      .select("id,organization_id,opportunity_id")
+      .select("id,event_id,organization_id,opportunity_id")
       .single();
 
     if (error || !data) return { error: error?.message ?? "Could not create task." };
@@ -428,19 +485,21 @@ async function maybeCreateSecondEmailFollowUp(
     contact_role_id: task.contact_role_id,
     created_by: profileId,
     due_date: nextReminder.dueDateString,
+    event_id: task.event_id,
     opportunity_id: task.opportunity_id,
     organization_id: task.organization_id,
     priority: "medium",
     related_activity_id: task.related_activity_id,
     status: "open",
     task_kind: "follow_up",
-    title: nextReminder.title
+    title: nextReminder.title,
+    venue_id: task.venue_id
   };
 
   const { data, error } = await supabase
     .from("tasks")
     .insert(insertPayload)
-    .select("id,organization_id,opportunity_id")
+    .select("id,event_id,organization_id,opportunity_id")
     .single();
 
   if (error) {

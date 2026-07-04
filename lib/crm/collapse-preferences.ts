@@ -15,6 +15,7 @@ export type SectionKey =
   | "trustees"
   | "research_evidence"
   | "city_group"
+  | "division_events"
   | "division_opportunity"
   | "approval_requirements"
   | "graduation_venue"
@@ -32,6 +33,7 @@ const DEFAULTS: Record<SectionKey, boolean> = {
   trustees: true,
   research_evidence: true,
   city_group: true,
+  division_events: false,
   division_opportunity: false,
   approval_requirements: true,
   graduation_venue: false,

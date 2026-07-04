@@ -160,6 +160,39 @@ export function DashboardPanels({ summary }: { summary: DashboardSummary }) {
       </section>
 
       <section className="rounded-card border border-border bg-surface shadow-soft">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+          <div>
+            <h2 className="text-base font-semibold text-text-heading">Upcoming events</h2>
+            <p className="mt-1 text-sm text-text-muted">
+              {summary.upcomingEventCount} upcoming · {summary.upcomingEventsNeedAttentionCount} need attention
+            </p>
+          </div>
+          <Link className="text-sm font-semibold text-brand-forest" href="/events">
+            View events
+          </Link>
+        </div>
+        {summary.upcomingEvents.length > 0 ? (
+          <div className="divide-y divide-border">
+            {summary.upcomingEvents.map((event) => (
+              <div className="grid gap-3 px-4 py-3 md:grid-cols-[1fr_auto] md:items-center" key={event.id}>
+                <div className="min-w-0">
+                  <p className="font-medium text-text-heading">{event.eventName}</p>
+                  <p className="mt-1 text-sm text-text-muted">
+                    {event.hostOrganizationName} · {event.dateLabel}
+                  </p>
+                </div>
+                <Link className="text-sm font-semibold text-brand-forest" href={event.detailHref}>
+                  Open event
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="px-4 py-6 text-sm text-text-muted">No upcoming events are scheduled.</p>
+        )}
+      </section>
+
+      <section className="rounded-card border border-border bg-surface shadow-soft">
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-base font-semibold text-text-heading">Your next tasks</h2>
         </div>

@@ -1318,7 +1318,7 @@ export async function getOrganizationDetail(
         : null;
       return {
         date: event.event_date,
-        href: null,
+        href: `/events/${event.id}`,
         id: event.id,
         name: event.event_name,
         status: event.event_confirmation_status,

@@ -60,12 +60,17 @@ const RELEVANT_RECORD_TYPES = [
   "contact_roles",
   "data_review_items",
   "departmental_contacts",
+  "event_planning_details",
+  "event_product_planning",
+  "event_staff_assignments",
+  "events",
   "organization_outreach",
   "organization_relationships",
   "organizations",
   "opportunities",
   "people",
-  "tasks"
+  "tasks",
+  "venues"
 ];
 
 export async function getActivityTimeline({
@@ -147,6 +152,7 @@ function mergeFiltersForScope(
   if (scope.kind === "person") merged.personId = scope.personId;
   if (scope.kind === "department") merged.departmentalContactId = scope.departmentalContactId;
   if (scope.kind === "contactRole") merged.contactRoleId = scope.contactRoleId;
+  if (scope.kind === "event") merged.eventId = scope.eventId;
   return merged;
 }
 
@@ -248,6 +254,7 @@ async function loadTimelineSources(
 ): Promise<TimelineSources> {
   const organizationId = scopedOrganizationId(filters, scope);
   const opportunityId = scope.kind === "opportunity" ? scope.opportunityId : undefined;
+  const eventId = scope.kind === "event" ? scope.eventId : filters.eventId;
   const scopedContactRoleIds = await resolveContactRoleScope(supabase, filters, scope);
 
   const activitiesPromise = scopedContactRoleIds
@@ -272,14 +279,14 @@ async function loadTimelineSources(
           .order("created_at", { ascending: false })
           .limit(sourceLimit)
       )
-    : loadTasks(supabase, { opportunityId, organizationId, sourceLimit });
+    : loadTasks(supabase, { eventId, opportunityId, organizationId, sourceLimit });
 
   const contactRolesPromise = scopedContactRoleIds
     ? loadContactRolesById(supabase, scopedContactRoleIds).then((rows) => ({
         data: Array.from(rows.values()),
         error: null
       }))
-    : loadContactRoles(supabase, { opportunityId, organizationId, sourceLimit });
+    : loadContactRoles(supabase, { eventId, opportunityId, organizationId, sourceLimit });
 
   let opportunitiesQuery = supabase
     .from("opportunities")
@@ -294,6 +301,7 @@ async function loadTimelineSources(
     );
   }
   if (opportunityId) opportunitiesQuery = opportunitiesQuery.eq("id", opportunityId);
+  if (eventId) opportunitiesQuery = opportunitiesQuery.eq("related_event_id", eventId);
 
   const auditPromise = recordTypeIds.length > 0
     ? supabase
@@ -367,10 +375,12 @@ async function loadActivities(
 async function loadTasks(
   supabase: ServerSupabaseClient,
   {
+    eventId,
     opportunityId,
     organizationId,
     sourceLimit
   }: {
+    eventId?: string;
     opportunityId?: string;
     organizationId?: string;
     sourceLimit: number;
@@ -384,16 +394,19 @@ async function loadTasks(
     .limit(sourceLimit);
   if (organizationId) query = query.eq("organization_id", organizationId);
   if (opportunityId) query = query.eq("opportunity_id", opportunityId);
+  if (eventId) query = query.eq("event_id", eventId);
   return query;
 }
 
 async function loadContactRoles(
   supabase: ServerSupabaseClient,
   {
+    eventId,
     opportunityId,
     organizationId,
     sourceLimit
   }: {
+    eventId?: string;
     opportunityId?: string;
     organizationId?: string;
     sourceLimit: number;
@@ -401,13 +414,14 @@ async function loadContactRoles(
 ) {
   let query = supabase
     .from("contact_roles")
-    .select("id,person_id,departmental_contact_id,organization_id,opportunity_id,department,role_title,created_by,created_at")
+    .select("id,person_id,departmental_contact_id,organization_id,event_id,venue_id,opportunity_id,department,role_title,created_by,created_at")
     .is("archived_at", null)
     .not("created_by", "is", null)
     .order("created_at", { ascending: false })
     .limit(sourceLimit);
   if (organizationId) query = query.eq("organization_id", organizationId);
   if (opportunityId) query = query.eq("opportunity_id", opportunityId);
+  if (eventId) query = query.eq("event_id", eventId);
   return query;
 }
 
@@ -444,6 +458,18 @@ async function resolveContactRoleScope(
     return (data ?? []).map((row) => row.id);
   }
 
+  const eventId = scope.kind === "event" ? scope.eventId : filters.eventId;
+  if (eventId) {
+    const { data, error } = await supabase
+      .from("contact_roles")
+      .select("id")
+      .eq("event_id", eventId)
+      .is("archived_at", null)
+      .limit(SCOPED_SOURCE_LIMIT);
+    failOnError(error, "Could not load event timeline contacts.");
+    return (data ?? []).map((row) => row.id);
+  }
+
   return null;
 }
 
@@ -455,6 +481,8 @@ async function buildTimelineMaps(
   const taskIds = new Set(sources.tasks.map((task) => task.id));
   const opportunityIds = new Set(sources.opportunities.map((opportunity) => opportunity.id));
   const organizationIds = new Set<string>();
+  const eventIds = new Set<string>();
+  const venueIds = new Set<string>();
   const outreachIds = new Set<string>();
   const relationshipIds = new Set<string>();
   const dataReviewItemIds = new Set<string>();
@@ -468,14 +496,16 @@ async function buildTimelineMaps(
     add(contactRoleIds, activity.contact_role_id);
   }
   for (const task of sources.tasks) {
-    collectTaskIds(task, { contactRoleIds, opportunityIds, organizationIds, profileIds });
+    collectTaskIds(task, { contactRoleIds, eventIds, opportunityIds, organizationIds, profileIds, venueIds });
   }
   for (const opportunity of sources.opportunities) {
-    collectOpportunityIds(opportunity, { contactRoleIds, organizationIds, profileIds });
+    collectOpportunityIds(opportunity, { contactRoleIds, eventIds, organizationIds, profileIds, venueIds });
   }
   for (const contactRole of sources.contactRoles) {
     add(profileIds, contactRole.created_by);
     add(organizationIds, contactRole.organization_id);
+    add(eventIds, contactRole.event_id);
+    add(venueIds, contactRole.venue_id);
     add(opportunityIds, contactRole.opportunity_id);
   }
   for (const batch of sources.imports) {
@@ -491,6 +521,15 @@ async function buildTimelineMaps(
     const tableName = recordTypeById.get(audit.record_type_id);
     if (tableName === "tasks") taskIds.add(audit.record_id);
     if (tableName === "opportunities") opportunityIds.add(audit.record_id);
+    if (tableName === "events") eventIds.add(audit.record_id);
+    if (tableName === "venues") venueIds.add(audit.record_id);
+    if (
+      tableName === "event_planning_details" ||
+      tableName === "event_product_planning" ||
+      tableName === "event_staff_assignments"
+    ) {
+      add(eventIds, stringValue(audit.after_value, "event_id") ?? stringValue(audit.before_value, "event_id"));
+    }
     if (tableName === "organizations") organizationIds.add(audit.record_id);
     if (tableName === "contact_roles") contactRoleIds.add(audit.record_id);
     if (tableName === "organization_outreach") outreachIds.add(audit.record_id);
@@ -501,6 +540,8 @@ async function buildTimelineMaps(
   const [
     tasks,
     opportunities,
+    eventsById,
+    venuesById,
     outreach,
     relationships,
     dataReviewItems,
@@ -508,6 +549,8 @@ async function buildTimelineMaps(
   ] = await Promise.all([
     loadTasksById(supabase, Array.from(taskIds)),
     loadOpportunitiesById(supabase, Array.from(opportunityIds)),
+    loadEventsById(supabase, Array.from(eventIds)),
+    loadVenuesById(supabase, Array.from(venueIds)),
     loadOutreachById(supabase, Array.from(outreachIds)),
     loadRelationshipsById(supabase, Array.from(relationshipIds)),
     loadDataReviewItemsById(supabase, Array.from(dataReviewItemIds)),
@@ -515,10 +558,25 @@ async function buildTimelineMaps(
   ]);
 
   for (const task of tasks.values()) {
-    collectTaskIds(task, { contactRoleIds, opportunityIds, organizationIds, profileIds });
+    collectTaskIds(task, { contactRoleIds, eventIds, opportunityIds, organizationIds, profileIds, venueIds });
   }
   for (const opportunity of opportunities.values()) {
-    collectOpportunityIds(opportunity, { contactRoleIds, organizationIds, profileIds });
+    collectOpportunityIds(opportunity, { contactRoleIds, eventIds, organizationIds, profileIds, venueIds });
+  }
+  for (const event of eventsById.values()) {
+    add(organizationIds, event.organization_id);
+    add(organizationIds, event.parent_organization_id);
+    add(venueIds, event.venue_id);
+    add(profileIds, event.created_by);
+    add(profileIds, event.updated_by);
+    add(profileIds, event.archived_by);
+  }
+  for (const venue of venuesById.values()) {
+    add(organizationIds, venue.organization_id);
+    add(organizationIds, venue.venue_operator_organization_id);
+    add(profileIds, venue.created_by);
+    add(profileIds, venue.updated_by);
+    add(profileIds, venue.archived_by);
   }
   for (const outreachRow of outreach.values()) {
     add(organizationIds, outreachRow.organization_id);
@@ -541,17 +599,37 @@ async function buildTimelineMaps(
     const tableName = item.record_type_id ? recordTypeById.get(item.record_type_id) : null;
     if (tableName === "organizations") add(organizationIds, item.record_id);
     if (tableName === "opportunities") add(opportunityIds, item.record_id);
+    if (tableName === "events") add(eventIds, item.record_id);
+    if (tableName === "venues") add(venueIds, item.record_id);
   }
   for (const contactRole of contactRolesById.values()) {
     add(profileIds, contactRole.created_by);
     add(organizationIds, contactRole.organization_id);
+    add(eventIds, contactRole.event_id);
+    add(venueIds, contactRole.venue_id);
     add(opportunityIds, contactRole.opportunity_id);
   }
 
   const opportunitiesWithReviewItems = await loadOpportunitiesById(supabase, Array.from(opportunityIds));
   for (const opportunity of opportunitiesWithReviewItems.values()) {
     opportunities.set(opportunity.id, opportunity);
-    collectOpportunityIds(opportunity, { contactRoleIds, organizationIds, profileIds });
+    collectOpportunityIds(opportunity, { contactRoleIds, eventIds, organizationIds, profileIds, venueIds });
+  }
+
+  const [completeEventsById, completeVenuesById] = await Promise.all([
+    loadEventsById(supabase, Array.from(eventIds)),
+    loadVenuesById(supabase, Array.from(venueIds))
+  ]);
+  for (const event of completeEventsById.values()) {
+    eventsById.set(event.id, event);
+    add(organizationIds, event.organization_id);
+    add(organizationIds, event.parent_organization_id);
+    add(venueIds, event.venue_id);
+  }
+  for (const venue of completeVenuesById.values()) {
+    venuesById.set(venue.id, venue);
+    add(organizationIds, venue.organization_id);
+    add(organizationIds, venue.venue_operator_organization_id);
   }
 
   const [organizationsById, profilesById, contactLabelsById] = await Promise.all([
@@ -564,13 +642,15 @@ async function buildTimelineMaps(
     contactLabelsById,
     contactRolesById,
     dataReviewItemsById: dataReviewItems,
+    eventsById,
     opportunitiesById: opportunities,
     organizationsById,
     outreachById: outreach,
     profilesById,
     recordTypeById,
     relationshipsById: relationships,
-    tasksById: tasks
+    tasksById: tasks,
+    venuesById
   };
 }
 
@@ -618,6 +698,22 @@ async function loadOrganizationsById(supabase: ServerSupabaseClient, ids: string
   return mapById(result.data);
 }
 
+async function loadEventsById(supabase: ServerSupabaseClient, ids: string[]) {
+  const result = await selectInChunks<Database["public"]["Tables"]["events"]["Row"]>(ids, (chunk) =>
+    supabase.from("events").select("*").in("id", chunk)
+  );
+  failOnError(result.error, "Could not load activity timeline event details.");
+  return mapById(result.data);
+}
+
+async function loadVenuesById(supabase: ServerSupabaseClient, ids: string[]) {
+  const result = await selectInChunks<Database["public"]["Tables"]["venues"]["Row"]>(ids, (chunk) =>
+    supabase.from("venues").select("*").in("id", chunk)
+  );
+  failOnError(result.error, "Could not load activity timeline venue details.");
+  return mapById(result.data);
+}
+
 async function loadOutreachById(supabase: ServerSupabaseClient, ids: string[]) {
   const result = await selectInChunks<OrganizationOutreachRow>(ids, (chunk) =>
     supabase.from("organization_outreach").select("*").in("id", chunk)
@@ -646,7 +742,7 @@ async function loadContactRolesById(supabase: ServerSupabaseClient, ids: string[
   const result = await selectInChunks<TimelineContactRole>(ids, (chunk) =>
     supabase
       .from("contact_roles")
-      .select("id,person_id,departmental_contact_id,organization_id,opportunity_id,department,role_title,created_by,created_at")
+      .select("id,person_id,departmental_contact_id,organization_id,event_id,venue_id,opportunity_id,department,role_title,created_by,created_at")
       .in("id", chunk)
   );
   failOnError(result.error, "Could not load activity timeline contact details.");
@@ -713,35 +809,43 @@ function collectTaskIds(
   task: TaskRow,
   sets: {
     contactRoleIds: Set<string>;
+    eventIds: Set<string>;
     opportunityIds: Set<string>;
     organizationIds: Set<string>;
     profileIds: Set<string>;
+    venueIds: Set<string>;
   }
 ) {
   add(sets.contactRoleIds, task.contact_role_id);
+  add(sets.eventIds, task.event_id);
   add(sets.opportunityIds, task.opportunity_id);
   add(sets.organizationIds, task.organization_id);
   add(sets.profileIds, task.assigned_user_id);
   add(sets.profileIds, task.completed_by);
   add(sets.profileIds, task.created_by);
+  add(sets.venueIds, task.venue_id);
 }
 
 function collectOpportunityIds(
   opportunity: OpportunityRow,
   sets: {
     contactRoleIds: Set<string>;
+    eventIds: Set<string>;
     organizationIds: Set<string>;
     profileIds: Set<string>;
+    venueIds: Set<string>;
   }
 ) {
   add(sets.contactRoleIds, opportunity.main_contact_role_id);
   add(sets.contactRoleIds, opportunity.backup_contact_role_id);
+  add(sets.eventIds, opportunity.related_event_id);
   add(sets.organizationIds, opportunity.primary_organization_id);
   add(sets.organizationIds, opportunity.parent_organization_id);
   add(sets.profileIds, opportunity.added_to_pipeline_by);
   add(sets.profileIds, opportunity.assigned_owner_id);
   add(sets.profileIds, opportunity.created_by);
   add(sets.profileIds, opportunity.updated_by);
+  add(sets.venueIds, opportunity.related_venue_id);
 }
 
 function collectJsonProfileIds(value: Json | null, profileIds: Set<string>) {
@@ -782,6 +886,7 @@ function mapById<T extends { id: string }>(rows: T[]) {
 }
 
 function getEmptyState(scope: ActivityTimelineScope) {
+  if (scope.kind === "event") return "No activity has been recorded for this event yet.";
   if (scope.kind === "organization") return "No activity has been recorded for this organization yet.";
   if (scope.kind === "division" || scope.kind === "school") {
     return "No outreach or CRM activity has been recorded yet.";

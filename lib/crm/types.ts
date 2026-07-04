@@ -8,6 +8,12 @@ export type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row
 export type OrganizationRelationshipRow =
   Database["public"]["Tables"]["organization_relationships"]["Row"];
 export type EventRow = Database["public"]["Tables"]["events"]["Row"];
+export type EventPlanningDetailsRow =
+  Database["public"]["Tables"]["event_planning_details"]["Row"];
+export type EventProductPlanningRow =
+  Database["public"]["Tables"]["event_product_planning"]["Row"];
+export type EventStaffAssignmentRow =
+  Database["public"]["Tables"]["event_staff_assignments"]["Row"];
 export type VenueRow = Database["public"]["Tables"]["venues"]["Row"];
 export type ImportedResearchScoreRow =
   Database["public"]["Tables"]["imported_research_scores"]["Row"];

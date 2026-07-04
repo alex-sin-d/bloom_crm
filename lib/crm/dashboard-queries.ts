@@ -3,6 +3,7 @@ import { failOnError, selectInChunks, uniqueValues } from "@/lib/crm/query-utils
 import { enrichOpportunityRows, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import { getDashboardTaskSnapshot, type DashboardTaskSnapshot } from "@/lib/crm/task-queries";
 import { getActivityTimeline } from "@/lib/crm/activity-queries";
+import { getDashboardEventsSnapshot, type DashboardEventsSnapshot } from "@/lib/crm/event-queries";
 import {
   getDashboardDataReviewSnapshot,
   type DashboardDataReviewSnapshot
@@ -28,6 +29,9 @@ export type DashboardSummary = {
   researchAwaitingReviewCount: number;
   tierOneResearch: OpportunityListItem[];
   unresolvedReviewCount: number;
+  upcomingEventCount: number;
+  upcomingEvents: DashboardEventsSnapshot["upcomingEvents"];
+  upcomingEventsNeedAttentionCount: number;
   waitingApprovalCount: number;
 };
 
@@ -215,6 +219,9 @@ export async function getDashboardSummary(
       researchAwaitingReviewCount: 0,
       tierOneResearch: [],
       unresolvedReviewCount: 0,
+      upcomingEventCount: 0,
+      upcomingEvents: [],
+      upcomingEventsNeedAttentionCount: 0,
       waitingApprovalCount: 0
     };
   }
@@ -230,7 +237,8 @@ export async function getDashboardSummary(
     waitingApprovalCount,
     recentHumanActivity,
     tierOneResearch,
-    organizationSnapshot
+    organizationSnapshot,
+    eventsSnapshot
   ] = await Promise.all([
     countResearch(supabase),
     countActivePipeline(supabase),
@@ -244,7 +252,8 @@ export async function getDashboardSummary(
       scope: { kind: "dashboard" }
     }),
     getTierOneResearch(supabase),
-    getDashboardOrganizationSnapshot(supabase, today)
+    getDashboardOrganizationSnapshot(supabase, today),
+    getDashboardEventsSnapshot(supabase)
   ]);
   const recentActivity = recentHumanActivity.events.length > 0
     ? recentHumanActivity
@@ -271,6 +280,9 @@ export async function getDashboardSummary(
     researchAwaitingReviewCount,
     tierOneResearch,
     unresolvedReviewCount: dataReviewSnapshot.openIssueCount,
+    upcomingEventCount: eventsSnapshot.upcomingCount,
+    upcomingEvents: eventsSnapshot.upcomingEvents,
+    upcomingEventsNeedAttentionCount: eventsSnapshot.needsAttentionCount,
     waitingApprovalCount
   };
 }

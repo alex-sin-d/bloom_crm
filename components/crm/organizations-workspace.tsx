@@ -891,15 +891,26 @@ export function OrganizationDetailWorkspace({
       </DetailSection>
 
       <DetailSection defaultOpen={detail.events.length > 0} title="Events" summary={`${detail.events.length} linked`}>
+        <div className="mb-3 flex justify-end">
+          <Link className="text-sm font-semibold text-brand-forest" href={`/events?organization=${detail.organization.id}`}>
+            View all organization events
+          </Link>
+        </div>
         {detail.events.length > 0 ? (
           <div className="divide-y divide-border">
             {detail.events.map((event) => (
               <div className="py-3 text-sm" key={event.id}>
-                <p className="font-medium text-text-heading">{event.name}</p>
+                <p className="font-medium text-text-heading">
+                  {event.href ? <Link className="hover:text-brand-forest" href={event.href}>{event.name}</Link> : event.name}
+                </p>
                 <p className="text-text-muted">
                   {formatDate(event.date)} · {event.venueName ?? "Venue not added"} · {formatEnumLabel(event.status)}
                 </p>
-                <p className="mt-1 text-xs text-text-muted">Event detail is limited in this phase.</p>
+                {event.href ? (
+                  <Link className="mt-1 inline-flex text-xs font-semibold text-brand-forest" href={event.href}>
+                    Open event
+                  </Link>
+                ) : null}
               </div>
             ))}
           </div>

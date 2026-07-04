@@ -182,6 +182,24 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
             </dl>
           </DetailSection>
 
+          <DetailSection title="Linked event">
+            {opportunity.relatedEvent ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-text-heading">{opportunity.relatedEvent.eventName}</p>
+                  <p className="mt-1 text-sm text-text-muted">
+                    {formatDate(opportunity.relatedEvent.eventDate)} · {formatEnumLabel(opportunity.relatedEvent.eventConfirmationStatus)}
+                  </p>
+                </div>
+                <Link className="text-sm font-semibold text-brand-forest" href={`/events/${opportunity.relatedEvent.id}`}>
+                  Open event
+                </Link>
+              </div>
+            ) : (
+              <EmptyLine>No event is linked to this opportunity.</EmptyLine>
+            )}
+          </DetailSection>
+
           <DetailSection title="Outreach">
             {detail.contacts.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2">

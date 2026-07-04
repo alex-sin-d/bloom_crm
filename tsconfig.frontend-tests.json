@@ -23,6 +23,7 @@
     "lib/crm/contact-duplicates.ts",
     "lib/crm/contact-logic.ts",
     "lib/crm/data-review-logic.ts",
+    "lib/crm/event-logic.ts",
     "lib/crm/format.ts",
     "lib/crm/organization-logic.ts",
     "lib/crm/outreach-labels.ts",

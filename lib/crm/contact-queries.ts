@@ -1,4 +1,5 @@
 import { getActivityTimeline } from "@/lib/crm/activity-queries";
+import { getRelatedEventsForContactRoles, type RelatedEventSummary } from "@/lib/crm/event-queries";
 import {
   CONTACT_DIRECTORY_PAGE_SIZE,
   CONTACT_DIRECTORY_SORTS,
@@ -166,6 +167,7 @@ export type ContactDetail = {
   phone: string | null;
   roles: ContactRoleDetail[];
   sourceLabel: "Added from research" | "Added manually";
+  upcomingEvents: RelatedEventSummary[];
   updatedAt: string;
   viewAllActivityHref: string;
 };
@@ -663,7 +665,7 @@ async function buildContactDetail(
     subject.kind === "department" ? subject.row.organization_id : null,
     ...roleRows.map((role) => role.organization_id)
   ]);
-  const [organizationsById, outreachRows, tasks, dataIssues, activityTimeline] = await Promise.all([
+  const [organizationsById, outreachRows, tasks, dataIssues, activityTimeline, upcomingEvents] = await Promise.all([
     loadOrganizationsById(supabase, organizationIds),
     loadOutreachByOrganizationIds(supabase, organizationIds),
     loadTasksByContactRoleIds(supabase, roleIds),
@@ -681,7 +683,8 @@ async function buildContactDetail(
         subject.kind === "person"
           ? { kind: "person", personId: subject.row.id }
           : { kind: "department", departmentalContactId: subject.row.id }
-    })
+    }),
+    getRelatedEventsForContactRoles(roleIds, supabase, 5)
   ]);
 
   const taskProfilesById =
@@ -725,6 +728,7 @@ async function buildContactDetail(
       toRoleDetail(role, organizationsById, primaryByRole, backupByRole)
     ),
     sourceLabel: subject.row.created_by ? "Added manually" : "Added from research",
+    upcomingEvents,
     updatedAt: subject.row.updated_at,
     viewAllActivityHref:
       subject.kind === "person"

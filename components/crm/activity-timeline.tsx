@@ -147,6 +147,7 @@ export function ActivityFilterForm({
           <input name="department" type="hidden" value={filters.departmentalContactId} />
         ) : null}
         {filters.contactRoleId ? <input name="contactRole" type="hidden" value={filters.contactRoleId} /> : null}
+        {filters.eventId ? <input name="event" type="hidden" value={filters.eventId} /> : null}
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
           <label className="grid gap-1 text-sm font-medium text-text-body">
             Search
@@ -334,6 +335,7 @@ function activityHref(filters: ActivityTimelineFilters, cursor?: string | null) 
   setParam(params, "person", filters.personId);
   setParam(params, "department", filters.departmentalContactId);
   setParam(params, "contactRole", filters.contactRoleId);
+  setParam(params, "event", filters.eventId);
   setParam(params, "division", filters.schoolDivisionId);
   setParam(params, "school", filters.schoolId);
   setParam(params, "from", filters.dateFrom);
@@ -378,6 +380,7 @@ function activeFilterChips(filters: ActivityTimelineFilters, options: ActivityTi
     filters.departmentalContactId ? "Department activity" : null
   );
   addChip(chips, filters, "contactRoleId", filters.contactRoleId ? "Contact role activity" : null);
+  addChip(chips, filters, "eventId", filters.eventId ? "Event activity" : null);
 
   return chips;
 }

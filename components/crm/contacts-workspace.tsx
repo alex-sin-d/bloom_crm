@@ -739,6 +739,7 @@ export function ContactDetailWorkspace({
         </div>
         <div className="space-y-5">
           <TasksSection tasks={detail.openTasks} />
+          <ContactEventsSection events={detail.upcomingEvents} />
           <DataIssuesSection issues={detail.dataIssues} />
           <ActivitySummarySection
             emptyText="No activity has been recorded for this contact yet."
@@ -1199,6 +1200,30 @@ function TasksSection({ tasks }: { tasks: ContactDetail["openTasks"] }) {
         </div>
       ) : (
         <p className="px-4 py-6 text-sm text-text-muted">No open tasks are linked to this contact.</p>
+      )}
+    </section>
+  );
+}
+
+function ContactEventsSection({ events }: { events: ContactDetail["upcomingEvents"] }) {
+  return (
+    <section className="rounded-card border border-border bg-surface shadow-soft">
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="text-base font-semibold text-text-heading">Upcoming events</h2>
+      </div>
+      {events.length > 0 ? (
+        <div className="divide-y divide-border">
+          {events.map((event) => (
+            <Link className="block px-4 py-3 hover:bg-surface-subtle" href={event.href} key={event.id}>
+              <p className="font-medium text-text-heading">{event.name}</p>
+              <p className="mt-1 text-sm text-text-muted">
+                {event.dateLabel} - {event.statusLabel}
+              </p>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="px-4 py-6 text-sm text-text-muted">No upcoming events are explicitly linked to this contact.</p>
       )}
     </section>
   );

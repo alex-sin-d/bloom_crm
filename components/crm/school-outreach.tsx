@@ -475,12 +475,19 @@ export function EventList({
 
         return (
           <article className="rounded-control border border-border bg-surface-subtle p-3" key={event.id}>
-            <h3 className="font-semibold text-text-heading">{event.event_name}</h3>
+            <h3 className="font-semibold text-text-heading">
+              <Link className="hover:text-brand-forest" href={`/events/${event.id}`}>
+                {event.event_name}
+              </Link>
+            </h3>
             <dl className="mt-3 grid gap-3 text-sm md:grid-cols-3">
               <InfoLine label="Date" value={formatDate(event.event_date)} />
               <InfoLine label="Date status" value={formatEnumLabel(event.date_status)} />
               <InfoLine label="Venue" value={venueName} />
             </dl>
+            <Link className="mt-3 inline-flex text-sm font-semibold text-brand-forest" href={`/events/${event.id}`}>
+              Open event
+            </Link>
           </article>
         );
       })}

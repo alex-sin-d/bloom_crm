@@ -19,10 +19,12 @@ import type {
   ActivityRow,
   AuditLogRow,
   DataReviewItemRow,
+  EventRow,
   OrganizationOutreachRow,
   OpportunityRow,
   OrganizationRow,
-  TaskRow
+  TaskRow,
+  VenueRow
 } from "../../lib/crm/types.js";
 
 function maps(overrides: Partial<TimelineMaps> = {}): TimelineMaps {
@@ -42,11 +44,13 @@ function maps(overrides: Partial<TimelineMaps> = {}): TimelineMaps {
           created_by: "alex",
           department: "Admissions",
           departmental_contact_id: null,
+          event_id: null,
           id: "contact-1",
           organization_id: "org-1",
           opportunity_id: "opp-1",
           person_id: "person-1",
-          role_title: "Principal"
+          role_title: "Principal",
+          venue_id: null
         }
       ],
       [
@@ -56,15 +60,18 @@ function maps(overrides: Partial<TimelineMaps> = {}): TimelineMaps {
           created_by: "sam",
           department: "Office",
           departmental_contact_id: "department-1",
+          event_id: null,
           id: "contact-2",
           organization_id: "org-1",
           opportunity_id: null,
           person_id: null,
-          role_title: "Office"
+          role_title: "Office",
+          venue_id: null
         }
       ]
     ]),
     dataReviewItemsById: new Map([["review-1", dataReviewItem()]]),
+    eventsById: new Map(),
     opportunitiesById: new Map([[opportunity.id, opportunity]]),
     organizationsById: new Map([[organization.id, organization]]),
     outreachById: new Map([["outreach-1", outreach()]]),
@@ -74,6 +81,8 @@ function maps(overrides: Partial<TimelineMaps> = {}): TimelineMaps {
     ]),
     recordTypeById: new Map([
       ["rt-data-review", "data_review_items"],
+      ["rt-events", "events"],
+      ["rt-event-planning", "event_planning_details"],
       ["rt-organization-outreach", "organization_outreach"],
       ["rt-organizations", "organizations"],
       ["rt-opportunities", "opportunities"],
@@ -81,6 +90,7 @@ function maps(overrides: Partial<TimelineMaps> = {}): TimelineMaps {
     ]),
     relationshipsById: new Map(),
     tasksById: new Map([[taskRow.id, taskRow]]),
+    venuesById: new Map(),
     ...overrides
   };
 }
@@ -130,6 +140,28 @@ function task(overrides: Partial<TaskRow> = {}): TaskRow {
     title: "Email follow-up",
     ...overrides
   } as TaskRow;
+}
+
+function eventRow(overrides: Partial<EventRow> = {}): EventRow {
+  return {
+    event_confirmation_status: "tentative",
+    event_date: "2026-07-10",
+    event_name: "Holy Cross Graduation",
+    id: "event-1",
+    organization_id: "org-1",
+    parent_organization_id: null,
+    venue_id: "venue-1",
+    ...overrides
+  } as EventRow;
+}
+
+function venue(overrides: Partial<VenueRow> = {}): VenueRow {
+  return {
+    id: "venue-1",
+    organization_id: "venue-org-1",
+    venue_operator_organization_id: null,
+    ...overrides
+  } as VenueRow;
 }
 
 function activity(overrides: Partial<ActivityRow> = {}): ActivityRow {
@@ -250,6 +282,33 @@ describe("activity timeline mapping", () => {
       )?.title,
       "Follow-up completed"
     );
+  });
+
+  it("maps event audits to the Events category and event workspace link", () => {
+    const eventMaps = maps({
+      eventsById: new Map([["event-1", eventRow()]]),
+      organizationsById: new Map([
+        ["org-1", org()],
+        ["venue-org-1", org({ id: "venue-org-1", name: "TCU Place", organization_type: "venue" })]
+      ]),
+      venuesById: new Map([["venue-1", venue()]])
+    });
+    const mapped = buildAuditEvent(
+      audit({
+        after_value: { event_date: "2026-07-10" },
+        before_value: { event_date: "2026-07-09" },
+        field_name: "event_date",
+        record_id: "event-1",
+        record_type_id: "rt-events"
+      }),
+      eventMaps
+    );
+
+    assert.equal(mapped?.category, "events");
+    assert.equal(mapped?.title, "Event schedule changed");
+    assert.equal(mapped?.href, "/events/event-1");
+    assert.deepEqual(mapped?.relatedEventIds, ["event-1"]);
+    assert.equal(filterTimelineEvents([mapped!], { eventId: "event-1", hasContact: false, includeSystem: false }).length, 1);
   });
 
   it("maps opportunity activation and suppresses fallback duplicates", () => {

@@ -786,6 +786,313 @@ export type Database = {
           },
         ]
       }
+      event_planning_details: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          attendance_notes: string | null
+          booth_sales_location: string | null
+          cold_storage_availability: Database["public"]["Enums"]["event_resource_availability"]
+          cold_storage_notes: string | null
+          created_at: string
+          created_by: string | null
+          customer_flow_notes: string | null
+          electricity_availability: Database["public"]["Enums"]["event_resource_availability"]
+          electricity_notes: string | null
+          event_end_time: string | null
+          event_id: string
+          expected_family_attendance: number | null
+          external_staff_notes: string | null
+          id: string
+          loading_access_notes: string | null
+          parking_entry_notes: string | null
+          payment_restrictions: string | null
+          pos_notes: string | null
+          required_staff_count: number | null
+          sales_close_time: string | null
+          sales_open_time: string | null
+          sales_rules_notes: string | null
+          setup_access_time: string | null
+          setup_notes: string | null
+          staff_arrival_time: string | null
+          staffing_notes: string | null
+          storage_availability: Database["public"]["Enums"]["event_resource_availability"]
+          storage_notes: string | null
+          teardown_time: string | null
+          updated_at: string
+          updated_by: string | null
+          venue_layout_notes: string | null
+          venue_rules_notes: string | null
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          attendance_notes?: string | null
+          booth_sales_location?: string | null
+          cold_storage_availability?: Database["public"]["Enums"]["event_resource_availability"]
+          cold_storage_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_flow_notes?: string | null
+          electricity_availability?: Database["public"]["Enums"]["event_resource_availability"]
+          electricity_notes?: string | null
+          event_end_time?: string | null
+          event_id: string
+          expected_family_attendance?: number | null
+          external_staff_notes?: string | null
+          id?: string
+          loading_access_notes?: string | null
+          parking_entry_notes?: string | null
+          payment_restrictions?: string | null
+          pos_notes?: string | null
+          required_staff_count?: number | null
+          sales_close_time?: string | null
+          sales_open_time?: string | null
+          sales_rules_notes?: string | null
+          setup_access_time?: string | null
+          setup_notes?: string | null
+          staff_arrival_time?: string | null
+          staffing_notes?: string | null
+          storage_availability?: Database["public"]["Enums"]["event_resource_availability"]
+          storage_notes?: string | null
+          teardown_time?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          venue_layout_notes?: string | null
+          venue_rules_notes?: string | null
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          attendance_notes?: string | null
+          booth_sales_location?: string | null
+          cold_storage_availability?: Database["public"]["Enums"]["event_resource_availability"]
+          cold_storage_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_flow_notes?: string | null
+          electricity_availability?: Database["public"]["Enums"]["event_resource_availability"]
+          electricity_notes?: string | null
+          event_end_time?: string | null
+          event_id?: string
+          expected_family_attendance?: number | null
+          external_staff_notes?: string | null
+          id?: string
+          loading_access_notes?: string | null
+          parking_entry_notes?: string | null
+          payment_restrictions?: string | null
+          pos_notes?: string | null
+          required_staff_count?: number | null
+          sales_close_time?: string | null
+          sales_open_time?: string | null
+          sales_rules_notes?: string | null
+          setup_access_time?: string | null
+          setup_notes?: string | null
+          staff_arrival_time?: string | null
+          staffing_notes?: string | null
+          storage_availability?: Database["public"]["Enums"]["event_resource_availability"]
+          storage_notes?: string | null
+          teardown_time?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          venue_layout_notes?: string | null
+          venue_rules_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_planning_details_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_planning_details_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_planning_details_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_planning_details_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_product_planning: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string | null
+          estimated_quantity: number | null
+          event_id: string
+          id: string
+          normalized_product_name: string | null
+          notes: string | null
+          product_name: string
+          restriction_notes: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_quantity?: number | null
+          event_id: string
+          id?: string
+          normalized_product_name?: string | null
+          notes?: string | null
+          product_name: string
+          restriction_notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_quantity?: number | null
+          event_id?: string
+          id?: string
+          normalized_product_name?: string | null
+          notes?: string | null
+          product_name?: string
+          restriction_notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_product_planning_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_product_planning_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_product_planning_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_product_planning_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_staff_assignments: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          arrival_time: string | null
+          created_at: string
+          created_by: string | null
+          event_id: string
+          id: string
+          notes: string | null
+          profile_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          arrival_time?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_id: string
+          id?: string
+          notes?: string | null
+          profile_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          arrival_time?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_id?: string
+          id?: string
+          notes?: string | null
+          profile_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_staff_assignments_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_staff_assignments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_staff_assignments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_staff_assignments_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_staff_assignments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           archive_reason: string | null
@@ -3200,6 +3507,11 @@ export type Database = {
         | "estimated_annual_timing"
         | "not_publicly_available"
         | "conflicting"
+      event_resource_availability:
+        | "unknown"
+        | "available"
+        | "not_available"
+        | "needs_confirmation"
       event_type:
         | "school_graduation"
         | "convocation"
@@ -3750,6 +4062,12 @@ export const Constants = {
         "estimated_annual_timing",
         "not_publicly_available",
         "conflicting",
+      ],
+      event_resource_availability: [
+        "unknown",
+        "available",
+        "not_available",
+        "needs_confirmation",
       ],
       event_type: [
         "school_graduation",

@@ -18,6 +18,7 @@ import {
 } from "@/components/crm/outreach-contacts";
 import { requireAuthorizedSession } from "@/lib/auth/session";
 import { getActivityTimeline } from "@/lib/crm/activity-queries";
+import { getRelatedEventsForOrganization } from "@/lib/crm/event-queries";
 import {
   getSchoolDivisionDetail,
   parseSchoolOutreachSearch
@@ -39,13 +40,14 @@ export default async function SchoolDivisionPage({
 
   const [{ divisionId }, rawSearchParams] = await Promise.all([params, searchParams]);
   const filters = parseSchoolOutreachSearch(rawSearchParams);
-  const [detail, activityTimeline] = await Promise.all([
+  const [detail, activityTimeline, divisionEvents] = await Promise.all([
     getSchoolDivisionDetail(divisionId, { q: filters.q }, session.profile.id),
     getActivityTimeline({
       filters: { includeSystem: false },
       limit: 10,
       scope: { kind: "division", organizationId: divisionId }
-    })
+    }),
+    getRelatedEventsForOrganization(divisionId)
   ]);
 
   if (!detail) {
@@ -145,6 +147,36 @@ export default async function SchoolDivisionPage({
       {/* 3. Division opportunity */}
       <CollapsibleSection
         preferences={detail.collapsePreferences}
+        sectionKey="division_events"
+        title="Events"
+        summary={`${divisionEvents.length} direct event${divisionEvents.length !== 1 ? "s" : ""}`}
+      >
+        {divisionEvents.length > 0 ? (
+          <div className="space-y-3">
+            {divisionEvents.map((event) => (
+              <article className="rounded-control border border-border bg-surface-subtle p-3" key={event.id}>
+                <h3 className="font-semibold text-text-heading">
+                  <Link className="hover:text-brand-forest" href={event.href}>
+                    {event.name}
+                  </Link>
+                </h3>
+                <p className="mt-1 text-sm text-text-muted">
+                  {event.dateLabel} · {event.statusLabel}
+                </p>
+                <Link className="mt-2 inline-flex text-sm font-semibold text-brand-forest" href={event.href}>
+                  Open event
+                </Link>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-text-muted">No division-level events have been recorded yet.</p>
+        )}
+      </CollapsibleSection>
+
+      {/* 4. Division opportunity */}
+      <CollapsibleSection
+        preferences={detail.collapsePreferences}
         sectionKey="division_opportunity"
         title="Division opportunity"
         summary={`${detail.opportunities.length} opportunity record${detail.opportunities.length !== 1 ? "s" : ""}`}
@@ -152,7 +184,7 @@ export default async function SchoolDivisionPage({
         <OpportunitySummaryList opportunities={detail.opportunities} />
       </CollapsibleSection>
 
-      {/* 4. Approval requirements */}
+      {/* 5. Approval requirements */}
       <CollapsibleSection
         defaultCollapsed
         preferences={detail.collapsePreferences}
@@ -163,7 +195,7 @@ export default async function SchoolDivisionPage({
         <ApprovalList approvals={detail.approvals} />
       </CollapsibleSection>
 
-      {/* 5. Tasks and activity */}
+      {/* 6. Tasks and activity */}
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <div className="space-y-5">
           <DetailSection title="Open tasks">
@@ -179,7 +211,7 @@ export default async function SchoolDivisionPage({
           />
         </div>
 
-        {/* 6. Research evidence and data issues */}
+        {/* 7. Research evidence and data issues */}
         <aside className="space-y-5">
           <CollapsibleSection
             defaultCollapsed

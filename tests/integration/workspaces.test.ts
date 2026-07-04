@@ -15,6 +15,12 @@ import {
 } from "@/lib/crm/contact-queries";
 import { getDashboardSummary } from "@/lib/crm/dashboard-queries";
 import {
+  getDashboardEventsSnapshot,
+  getEventDetail,
+  getEventDirectory,
+  parseEventDirectoryFilters
+} from "@/lib/crm/event-queries";
+import {
   getOrganizationDetail,
   getOrganizationDirectory,
   parseOrganizationDirectoryFilters
@@ -64,6 +70,15 @@ async function firstOpportunityId(): Promise<string | null> {
   return data?.[0]?.id ?? null;
 }
 
+async function firstEventId(): Promise<string | null> {
+  const { data } = await activeOwnerClient(ownerId)
+    .from("events")
+    .select("id")
+    .is("archived_at", null)
+    .limit(1);
+  return data?.[0]?.id ?? null;
+}
+
 async function firstPersonId(): Promise<string | null> {
   const { data } = await activeOwnerClient(ownerId)
     .from("people")
@@ -90,6 +105,10 @@ async function sourceCounts() {
     tasks,
     opportunities,
     imports,
+    events,
+    eventPlanning,
+    eventProducts,
+    eventStaff,
     people,
     departments,
     contactRoles,
@@ -100,6 +119,10 @@ async function sourceCounts() {
     client.from("tasks").select("id", { count: "exact", head: true }),
     client.from("opportunities").select("id", { count: "exact", head: true }),
     client.from("import_batches").select("id", { count: "exact", head: true }),
+    client.from("events").select("id", { count: "exact", head: true }),
+    client.from("event_planning_details").select("id", { count: "exact", head: true }),
+    client.from("event_product_planning").select("id", { count: "exact", head: true }),
+    client.from("event_staff_assignments").select("id", { count: "exact", head: true }),
     client.from("people").select("id", { count: "exact", head: true }),
     client.from("departmental_contacts").select("id", { count: "exact", head: true }),
     client.from("contact_roles").select("id", { count: "exact", head: true }),
@@ -110,6 +133,10 @@ async function sourceCounts() {
   assert.equal(tasks.error, null);
   assert.equal(opportunities.error, null);
   assert.equal(imports.error, null);
+  assert.equal(events.error, null);
+  assert.equal(eventPlanning.error, null);
+  assert.equal(eventProducts.error, null);
+  assert.equal(eventStaff.error, null);
   assert.equal(people.error, null);
   assert.equal(departments.error, null);
   assert.equal(contactRoles.error, null);
@@ -120,6 +147,10 @@ async function sourceCounts() {
     contactMethods: contactMethods.count ?? 0,
     contactRoles: contactRoles.count ?? 0,
     departments: departments.count ?? 0,
+    eventPlanning: eventPlanning.count ?? 0,
+    eventProducts: eventProducts.count ?? 0,
+    eventStaff: eventStaff.count ?? 0,
+    events: events.count ?? 0,
     imports: imports.count ?? 0,
     opportunities: opportunities.count ?? 0,
     people: people.count ?? 0,
@@ -279,6 +310,67 @@ describe("workspace loaders resolve against the full imported dataset", { skip }
     assert.ok(missingInfo.rows.every((row) => !row.email || !row.phone));
     assert.ok(Array.isArray(searched.rows));
     assert.equal(paged.pagination.page, 2);
+  });
+
+  it("events directory loads tabs, filters, search, sorting, and pagination", async () => {
+    const client = activeOwnerClient(ownerId);
+    const [upcoming, all, needsAttention, searched, paged] = await Promise.all([
+      getEventDirectory(parseEventDirectoryFilters({}), client),
+      getEventDirectory(parseEventDirectoryFilters({ tab: "all" }), client),
+      getEventDirectory(parseEventDirectoryFilters({ tab: "needs_attention" }), client),
+      getEventDirectory(parseEventDirectoryFilters({ q: "graduation", tab: "all" }), client),
+      getEventDirectory(parseEventDirectoryFilters({ page: "2", pageSize: "10", tab: "all" }), client)
+    ]);
+
+    assert.ok(Array.isArray(upcoming.rows));
+    assert.ok(Array.isArray(all.rows));
+    assert.ok(all.pagination.count >= all.rows.length);
+    assert.ok(needsAttention.rows.every((row) => row.attentionReasons.length > 0));
+    assert.ok(Array.isArray(searched.rows));
+    assert.equal(paged.pagination.page, 2);
+  });
+
+  it("event detail, dashboard event snapshot, and event activity scope load safely", async () => {
+    const eventId = await firstEventId();
+    assert.ok(eventId, "expected at least one event in local data");
+    const [detail, snapshot, activity] = await Promise.all([
+      getEventDetail(eventId as string, activeOwnerClient(ownerId)),
+      getDashboardEventsSnapshot(activeOwnerClient(ownerId)),
+      getActivityTimeline({
+        client: activeOwnerClient(ownerId),
+        limit: 10,
+        scope: { kind: "event", eventId: eventId as string }
+      })
+    ]);
+
+    assert.ok(detail);
+    assert.equal(detail!.event.id, eventId);
+    assert.ok(Array.isArray(detail!.contacts));
+    assert.ok(Array.isArray(detail!.openTasks));
+    assert.ok(Array.isArray(detail!.activityEvents));
+    assert.ok(Array.isArray(snapshot.upcomingEvents));
+    assert.ok(snapshot.upcomingEvents.length <= 5);
+    assert.ok(Array.isArray(activity.events));
+    assertNewestFirst(activity.events);
+    assert.ok(activity.events.every((event) => event.relatedEventIds.includes(eventId as string)));
+  });
+
+  it("viewing and filtering events is read-only", async () => {
+    const before = await sourceCounts();
+    const eventId = await firstEventId();
+    assert.ok(eventId, "expected at least one event in local data");
+    await Promise.all([
+      getEventDirectory(parseEventDirectoryFilters({ q: "school", tab: "all" }), activeOwnerClient(ownerId)),
+      getEventDetail(eventId as string, activeOwnerClient(ownerId)),
+      getActivityTimeline({
+        client: activeOwnerClient(ownerId),
+        filters: { eventId: eventId as string },
+        limit: 10,
+        scope: { kind: "global" }
+      })
+    ]);
+    const after = await sourceCounts();
+    assert.deepEqual(after, before);
   });
 
   it("contact filters for organization, division, and school run against shared records", async () => {

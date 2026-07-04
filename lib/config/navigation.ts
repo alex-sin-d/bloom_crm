@@ -21,13 +21,13 @@ export const navigationGroups: NavigationGroup[] = [
       { href: "/data-review", label: "Data Issues to Review" },
       { href: "/organizations", label: "Organizations" },
       { href: "/contacts", label: "Contacts" },
+      { href: "/events", label: "Events" },
       { href: "/activity", label: "Activity" }
     ]
   },
   {
     label: "Coming soon",
     items: [
-      { label: "Events", status: "coming-soon" },
       { label: "Proposals", status: "coming-soon" },
       { label: "Templates", status: "coming-soon" },
       { label: "Settings", status: "coming-soon" }
