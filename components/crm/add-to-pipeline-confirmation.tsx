@@ -13,7 +13,7 @@ function SubmitActivationButton({ enabled }: { enabled: boolean }) {
       disabled={!enabled || pending}
       type="submit"
     >
-      {pending ? "Adding..." : "Add to pipeline"}
+      {pending ? "Starting..." : "Start active outreach"}
     </button>
   );
 }
@@ -63,8 +63,8 @@ export function AddToPipelineConfirmation({
           value="confirmed"
         />
         <span>
-          I understand this will move the opportunity into Active Opportunities. Previewing,
-          filtering, and opening this research did not make changes.
+          I understand this starts active outreach for this opportunity. Previewing, filtering,
+          and opening this research did not make changes.
         </span>
       </label>
       <SubmitActivationButton enabled={confirmed} />

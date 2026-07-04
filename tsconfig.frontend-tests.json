@@ -16,6 +16,8 @@
   },
   "include": [
     "tests/frontend/**/*.ts",
+    "lib/config/feature-visibility.ts",
+    "lib/config/navigation.ts",
     "lib/crm/add-to-pipeline.ts",
     "lib/crm/activity-timeline.ts",
     "lib/crm/business-days.ts",

@@ -174,14 +174,15 @@ function assertNewestFirst(events: Array<{ occurredAt: string; sourceId: string;
 }
 
 describe("workspace loaders resolve against the full imported dataset", { skip }, () => {
-  it("dashboard summary loads with data-review enrichment (proves the 414 is gone)", async () => {
+  it("dashboard summary loads without Events, Data Review, or Organizations enrichment", async () => {
     const summary = await getDashboardSummary(ownerId, activeOwnerClient(ownerId));
-    assert.equal(typeof summary.openTaskCount, "number");
-    assert.equal(typeof summary.unresolvedReviewCount, "number");
-    assert.ok(Array.isArray(summary.dataReviewNextItems));
-    assert.ok(Array.isArray(summary.tierOneResearch));
-    // The imported dataset has open unresolved relationships; enrichment must surface them.
-    assert.ok(summary.unresolvedReviewCount > 0, "owner should see open review issues");
+    assert.equal(typeof summary.followUpsDueTodayCount, "number");
+    assert.equal(typeof summary.overdueFollowUpCount, "number");
+    assert.equal(typeof summary.awaitingReplyCount, "number");
+    assert.ok(Array.isArray(summary.nextTasks));
+    assert.ok(Array.isArray(summary.outreachNeedingAttention));
+    // The imported dataset has active outreach; the summary must surface it.
+    assert.ok(summary.activeOutreachCount > 0, "owner should see active outreach");
   });
 
   it("global activity timeline loads and excludes routine system activity by default", async () => {
@@ -250,11 +251,15 @@ describe("workspace loaders resolve against the full imported dataset", { skip }
     assert.deepEqual(after, before);
   });
 
-  it("dashboard summary uses mapped recent activity events", async () => {
+  it("dashboard summary uses mapped recent outreach events only", async () => {
     const summary = await getDashboardSummary(ownerId, activeOwnerClient(ownerId));
-    assert.ok(Array.isArray(summary.recentActivityEvents));
-    assert.ok(summary.recentActivityEvents.length <= 5);
-    assertNewestFirst(summary.recentActivityEvents);
+    assert.ok(Array.isArray(summary.recentOutreach));
+    assert.ok(summary.recentOutreach.length <= 8);
+    assert.ok(
+      summary.recentOutreach.every((event) => event.source === "activities"),
+      "recent outreach only surfaces logged outreach activities"
+    );
+    assertNewestFirst(summary.recentOutreach);
   });
 
   it("dashboard data-review snapshot enriches without failing", async () => {
@@ -507,22 +512,23 @@ describe("workspace loaders resolve against the full imported dataset", { skip }
 });
 
 describe("active-owner read access, inactive/anonymous denial", { skip }, () => {
-  it("an active owner can read review issues", async () => {
+  it("an active owner can read dashboard outreach data", async () => {
     const summary = await getDashboardSummary(ownerId, activeOwnerClient(ownerId));
-    assert.ok(summary.unresolvedReviewCount > 0);
+    assert.ok(summary.activeOutreachCount > 0);
+    assert.ok(summary.recentOutreach.length > 0);
   });
 
   it("an inactive owner is denied (RLS hides rows, no crash)", async () => {
     const client = inactiveUserId ? userClient(inactiveUserId) : nonOwnerClient();
     const summary = await getDashboardSummary(ownerId, client);
-    assert.equal(summary.unresolvedReviewCount, 0);
-    assert.equal(summary.openTaskCount, 0);
+    assert.equal(summary.activeOutreachCount, 0);
+    assert.equal(summary.recentOutreach.length, 0);
   });
 
   it("an anonymous user is denied (RLS hides rows, no crash)", async () => {
     const summary = await getDashboardSummary(ownerId, anonymousClient());
-    assert.equal(summary.unresolvedReviewCount, 0);
-    assert.equal(summary.openTaskCount, 0);
+    assert.equal(summary.activeOutreachCount, 0);
+    assert.equal(summary.recentOutreach.length, 0);
   });
 
   it("inactive and anonymous users cannot read activity timeline rows", async () => {

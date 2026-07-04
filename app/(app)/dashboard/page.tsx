@@ -13,7 +13,7 @@ export default async function DashboardPage() {
       <PageHeader
         eyebrow="Start here"
         title="Bloom Boys CRM"
-        subtitle="See what needs attention, review possible opportunities, and open the active opportunities Bloom Boys has already chosen to pursue."
+        subtitle="See which follow-ups are due, which outreach needs attention, and what happened recently."
       />
       <DashboardPanels summary={summary} />
     </section>

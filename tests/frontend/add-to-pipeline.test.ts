@@ -20,7 +20,7 @@ const baseOpportunity: ActivationCandidate = {
   research_status: "research_only"
 };
 
-describe("Add to pipeline activation rules", () => {
+describe("Start active outreach activation rules", () => {
   it("allows a research-only opportunity to activate once", () => {
     assert.equal(getActivationBlocker(baseOpportunity), null);
   });

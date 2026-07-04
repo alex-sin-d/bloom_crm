@@ -1015,7 +1015,6 @@ async function loadOpportunityApprovals(supabase: ServerSupabaseClient, opportun
     supabase
       .from("opportunity_approval_items")
       .select("*")
-      .is("archived_at", null)
       .in("opportunity_id", chunk)
       .limit(500)
   );

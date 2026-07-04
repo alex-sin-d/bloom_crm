@@ -93,7 +93,7 @@ export default async function SchoolPage({ params, searchParams }: SchoolPagePro
 
       {showActivatedBanner ? (
         <div className="rounded-card border border-green-300 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
-          Added to Active Opportunities. Contact and outreach tools are now available.
+          Added to active outreach. Contact tools are now available.
         </div>
       ) : null}
 

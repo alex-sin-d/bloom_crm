@@ -28,7 +28,7 @@ function Message({ params }: { params: URLSearchParams }) {
   if (success === "added-to-pipeline") {
     return (
       <p className="mb-4 rounded-control border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-        Opportunity added to Active Opportunities. It starts at Ready for outreach.
+        Added to active outreach. Contact tools are now available.
       </p>
     );
   }
@@ -47,7 +47,7 @@ function Message({ params }: { params: URLSearchParams }) {
         "activation-failed": "The opportunity was not moved. It may already have been added by another request.",
         "audit-write-failed": "The opportunity moved, but the audit note could not be saved.",
         "invalid-owner": "Choose an active owner or leave the owner unassigned."
-      }[error] ?? "The pipeline update needs attention.";
+      }[error] ?? "The update needs attention.";
 
     return (
       <p className="mb-4 rounded-control border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -70,9 +70,9 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
   return (
     <section className="mx-auto max-w-7xl">
       <PageHeader
-        eyebrow="Pipeline"
+        eyebrow="Active outreach"
         title="Active Opportunities"
-        subtitle="These are opportunities Bloom Boys has intentionally chosen to pursue. Pipeline stage movement stays manual and is not built into this local frontend yet."
+        subtitle="These are opportunities Bloom Boys has intentionally chosen to pursue. Open the workspace on each row to contact, log, and follow up."
       />
       <Message params={urlParams} />
       <section className="mb-5 rounded-card border border-border bg-surface p-4 shadow-soft">
@@ -83,7 +83,7 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
           </p>
           <p>
             <strong className="text-text-body">Ready for outreach</strong> is the starting stage
-            after Add to Pipeline.
+            after you start active outreach.
           </p>
           <p>
             <strong className="text-text-body">Stage changes</strong> remain manual and are coming

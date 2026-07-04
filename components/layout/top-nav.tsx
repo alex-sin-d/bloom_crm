@@ -1,5 +1,7 @@
 import { signOutAction } from "@/app/(auth)/actions";
+import { adminToolsLink } from "@/lib/config/navigation";
 import type { ActiveOwnerProfile } from "@/lib/auth/session";
+import Link from "next/link";
 
 export function TopNav({ profile }: { profile: ActiveOwnerProfile }) {
   return (
@@ -18,6 +20,13 @@ export function TopNav({ profile }: { profile: ActiveOwnerProfile }) {
           />
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Desktop reaches Admin Tools from the sidebar; this keeps it reachable on mobile. */}
+          <Link
+            className="h-10 rounded-control border border-border bg-surface px-3 text-sm font-semibold leading-10 text-text-body transition hover:bg-surface-subtle lg:hidden"
+            href={adminToolsLink.href}
+          >
+            {adminToolsLink.label}
+          </Link>
           <div className="hidden rounded-chip border border-border bg-surface-subtle px-3 py-2 text-sm text-text-muted sm:block">
             {profile.displayName}
           </div>

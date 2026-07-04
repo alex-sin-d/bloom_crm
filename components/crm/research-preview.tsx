@@ -30,7 +30,7 @@ export function ResearchPreview({
         <h2 className="text-base font-semibold text-text-heading">Research preview</h2>
         <p className="mt-2 text-sm leading-6 text-text-muted">
           Choose an opportunity to preview its research. Previewing is read-only; nothing moves to
-          Active Opportunities until you confirm Add to Pipeline.
+          Active Opportunities until you confirm Start active outreach.
         </p>
       </aside>
     );

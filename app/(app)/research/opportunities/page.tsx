@@ -47,8 +47,8 @@ function Message({ params }: { params: URLSearchParams }) {
 
   const errorMessage =
     {
-      "archived_or_not_research": "This opportunity is not available for Add to Pipeline.",
-      "confirmation-required": "Confirm Add to Pipeline before moving an opportunity.",
+      "archived_or_not_research": "This opportunity is not available to start active outreach.",
+      "confirmation-required": "Confirm before starting active outreach.",
       "invalid-owner": "Choose an active owner or leave the owner unassigned.",
       "missing-opportunity": "Choose an opportunity before continuing.",
       "opportunity-not-found": "That opportunity could not be found.",
@@ -80,15 +80,15 @@ export default async function ResearchOpportunitiesPage({
   return (
     <section className="mx-auto max-w-7xl">
       <PageHeader
-        eyebrow="Research Opportunities"
+        eyebrow="Review"
         title="Opportunities to Review"
-        subtitle="These are possible prospects that have not yet been chosen for active outreach. Previewing research is read-only; Add to Pipeline requires explicit confirmation."
+        subtitle="These are possible prospects that have not yet been chosen for active outreach. Previewing research is read-only; starting active outreach requires explicit confirmation."
       />
       <Message params={urlParams} />
       <section className="mb-5 rounded-card border border-border bg-surface p-4 shadow-soft">
         <div className="grid gap-4 text-sm leading-6 text-text-muted md:grid-cols-3">
           <p>
-            <strong className="text-text-body">Research Opportunities</strong> are possible
+            <strong className="text-text-body">Opportunities to Review</strong> are possible
             prospects still being checked.
           </p>
           <p>
@@ -96,7 +96,7 @@ export default async function ResearchOpportunitiesPage({
             without making changes.
           </p>
           <p>
-            <strong className="text-text-body">Add to Pipeline</strong> means Bloom Boys has
+            <strong className="text-text-body">Start active outreach</strong> means Bloom Boys has
             intentionally chosen to pursue the opportunity.
           </p>
         </div>
