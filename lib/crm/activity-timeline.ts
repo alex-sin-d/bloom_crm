@@ -14,6 +14,20 @@ import type {
 } from "./types.js";
 import type { Database, Json } from "../supabase/database.types.js";
 
+const UNIVERSITY_OUTREACH_TYPES: ReadonlySet<CrmEnums["organization_type"]> = new Set([
+  "university",
+  "college",
+  "polytechnic"
+]);
+
+function isUniversityWorkspaceType(type: CrmEnums["organization_type"]) {
+  return UNIVERSITY_OUTREACH_TYPES.has(type);
+}
+
+function universityOutreachHref(organizationId: string) {
+  return `/university-outreach/institutions/${organizationId}`;
+}
+
 export const ACTIVITY_TIMELINE_CATEGORIES = [
   "outreach",
   "tasks",
@@ -1168,6 +1182,9 @@ function getOrganizationWorkspaceHref(organization: {
   if (organization.organizationType === "school_division") {
     return `/school-outreach/divisions/${organization.id}`;
   }
+  if (isUniversityWorkspaceType(organization.organizationType)) {
+    return universityOutreachHref(organization.id);
+  }
   return `/organizations/${organization.id}`;
 }
 
@@ -1178,6 +1195,7 @@ function getOpportunityWorkspaceHref(
   if (!organizationId) return null;
   if (opportunityType === "school") return `/school-outreach/schools/${organizationId}`;
   if (opportunityType === "division") return `/school-outreach/divisions/${organizationId}`;
+  if (opportunityType === "university") return universityOutreachHref(organizationId);
   return null;
 }
 

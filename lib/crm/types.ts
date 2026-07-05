@@ -30,6 +30,8 @@ export type DataReviewItemRow = Database["public"]["Tables"]["data_review_items"
 export type ResearchGapRow = Database["public"]["Tables"]["research_gaps"]["Row"];
 export type OrganizationOutreachRow =
   Database["public"]["Tables"]["organization_outreach"]["Row"];
+export type UniversityOutreachProfileRow =
+  Database["public"]["Tables"]["university_outreach_profiles"]["Row"];
 
 export type ProfileSummary = {
   displayName: string;

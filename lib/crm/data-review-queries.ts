@@ -1,3 +1,4 @@
+import { APP_USER_PERMISSION_LEVELS } from "@/lib/auth/roles";
 import { formatEnumLabel } from "@/lib/crm/format";
 import { getOpportunityWorkspaceHref } from "@/lib/crm/outreach-labels";
 import {
@@ -8,6 +9,10 @@ import {
   uniqueValues
 } from "@/lib/crm/query-utils";
 import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
+import {
+  getUniversityOutreachHref,
+  isUniversityOutreachOrganizationType
+} from "@/lib/crm/university-outreach-logic";
 import type { ProfileSummary } from "@/lib/crm/types";
 import {
   DATA_REVIEW_SOURCE_FILTER_VALUES,
@@ -217,7 +222,7 @@ async function getOwnerOptions(supabase: ServerSupabaseClient) {
     .from("profiles")
     .select("id,email,display_name")
     .eq("status", "active")
-    .eq("permission_level", "owner")
+    .in("permission_level", [...APP_USER_PERMISSION_LEVELS])
     .order("display_name", { ascending: true, nullsFirst: false });
 
   failOnError(error, "Could not load review owners.");
@@ -397,6 +402,8 @@ async function summarizeOrganizations(
           ? `/school-outreach/schools/${org.id}`
           : org.organization_type === "school_division"
             ? `/school-outreach/divisions/${org.id}`
+            : isUniversityOutreachOrganizationType(org.organization_type)
+              ? getUniversityOutreachHref(org.id)
             : `/organizations/${org.id}`;
       return [
         org.id,
@@ -526,6 +533,8 @@ async function summarizeOpportunities(
               ? "Open school workspace"
               : opportunity.opportunity_type === "division"
                 ? "Open division workspace"
+                : opportunity.opportunity_type === "university"
+                  ? "Open university workspace"
                 : "Open opportunity"
         }
       ];

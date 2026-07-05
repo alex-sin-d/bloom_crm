@@ -600,8 +600,14 @@ describe("getOpportunityWorkspaceHref", () => {
     );
   });
 
-  it("returns null for non-school/division types", () => {
-    assert.equal(getOpportunityWorkspaceHref("university", "xyz-789"), null);
+  it("returns university workspace for university opportunity type", () => {
+    assert.equal(
+      getOpportunityWorkspaceHref("university", "xyz-789"),
+      "/university-outreach/institutions/xyz-789"
+    );
+  });
+
+  it("returns null for non-outreach workspace types", () => {
     assert.equal(getOpportunityWorkspaceHref("venue", "xyz-789"), null);
     assert.equal(getOpportunityWorkspaceHref("event", "xyz-789"), null);
   });

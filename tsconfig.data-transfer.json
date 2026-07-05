@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": ".data-transfer-dist",
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["scripts/data-transfer/**/*.ts"]
+}

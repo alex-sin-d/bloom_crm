@@ -65,6 +65,22 @@ describe("organization workspace routing", () => {
     assert.equal(getSpecializedWorkspaceLabel("school_division"), "Open division workspace");
   });
 
+  it("routes universities, colleges, and polytechnics to University Outreach", () => {
+    assert.equal(
+      getOrganizationWorkspaceHref({ id: "uni-1", organizationType: "university" }),
+      "/university-outreach/institutions/uni-1"
+    );
+    assert.equal(
+      getOrganizationWorkspaceHref({ id: "college-1", organizationType: "college" }),
+      "/university-outreach/institutions/college-1"
+    );
+    assert.equal(
+      getOrganizationWorkspaceHref({ id: "poly-1", organizationType: "polytechnic" }),
+      "/university-outreach/institutions/poly-1"
+    );
+    assert.equal(getSpecializedWorkspaceLabel("university"), "Open university workspace");
+  });
+
   it("routes general organizations to the organization detail page", () => {
     assert.equal(
       getOrganizationWorkspaceHref({ id: "org-1", organizationType: "community_organization" }),

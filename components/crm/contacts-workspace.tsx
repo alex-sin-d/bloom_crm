@@ -17,6 +17,7 @@ import {
   type CreatePersonContactInput
 } from "@/app/(app)/contacts/actions";
 import { ActivitySummarySection } from "@/components/crm/activity-timeline";
+import { ContactEditButton, type EditableContact } from "@/components/crm/contact-edit-modal";
 import { Pagination } from "@/components/crm/pagination";
 import { StatusBadge } from "@/components/crm/status-badge";
 import {
@@ -25,6 +26,7 @@ import {
 } from "@/lib/crm/contact-logic";
 import type {
   ContactDetail,
+  ContactDirectoryItem,
   ContactDirectoryData,
   ContactDirectoryFilters,
   ContactFormOptions,
@@ -372,6 +374,64 @@ function CopyButton({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+function directoryRowToEditableContact(row: ContactDirectoryItem): EditableContact {
+  return {
+    contactCategory: row.contactCategory,
+    contactRoleId: row.contactRoleId,
+    department: row.department,
+    displayName: row.displayName,
+    email: {
+      id: row.emailMethodId,
+      isPrimary: row.emailMethodIsPrimary,
+      notes: row.emailMethodNotes,
+      value: row.email
+    },
+    firstName: row.firstName,
+    label: row.label,
+    lastName: row.lastName,
+    note: row.notes,
+    operationalStatus: row.operationalStatus,
+    phone: {
+      id: row.phoneMethodId,
+      isPrimary: row.phoneMethodIsPrimary,
+      notes: row.phoneMethodNotes,
+      value: row.phone
+    },
+    roleNote: row.roleNotes,
+    roleTitle: row.roleTitle,
+    subjectId: row.subjectId,
+    subjectType: row.subjectType
+  };
+}
+
+function detailToEditableContact(detail: ContactDetail): EditableContact {
+  const [firstName, ...rest] = detail.kind === "person" ? detail.displayName.split(" ") : [detail.displayName];
+  const primaryRole = detail.roles[0] ?? null;
+  const email = detail.methods.find((method) => method.methodType === "email") ?? null;
+  const phone = detail.methods.find((method) => method.methodType === "phone") ?? null;
+  return {
+    contactCategory: primaryRole?.contactCategory ?? null,
+    contactRoleId: primaryRole?.id ?? null,
+    department: primaryRole?.department ?? null,
+    displayName: detail.kind === "department" ? detail.displayName : null,
+    email: email
+      ? { id: email.id, isPrimary: email.isPrimary, notes: email.notes, value: email.value }
+      : null,
+    firstName: detail.kind === "person" ? firstName : null,
+    label: detail.displayName,
+    lastName: detail.kind === "person" ? rest.join(" ") : null,
+    note: detail.notes,
+    operationalStatus: primaryRole?.operationalStatus ?? null,
+    phone: phone
+      ? { id: phone.id, isPrimary: phone.isPrimary, notes: phone.notes, value: phone.value }
+      : null,
+    roleNote: primaryRole?.notes ?? null,
+    roleTitle: primaryRole?.roleTitle ?? null,
+    subjectId: detail.id,
+    subjectType: detail.kind
+  };
+}
+
 function DirectoryTable({
   currentParams,
   data
@@ -404,6 +464,7 @@ function DirectoryTable({
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Next follow-up</th>
               <th className="px-4 py-3">Last contact</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -451,6 +512,9 @@ function DirectoryTable({
                 </td>
                 <td className="px-4 py-3">{row.nextFollowUpDueDate ? formatDateLabel(row.nextFollowUpDueDate) : "No open follow-up"}</td>
                 <td className="px-4 py-3">{row.lastContactedAt ? formatDateTimeLabel(row.lastContactedAt) : "Never contacted"}</td>
+                <td className="px-4 py-3">
+                  <ContactEditButton contact={directoryRowToEditableContact(row)} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -716,6 +780,7 @@ export function ContactDetailWorkspace({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <ContactEditButton contact={detailToEditableContact(detail)} />
             <Link className={buttonClassName()} href={detail.viewAllActivityHref}>
               View all activity
             </Link>

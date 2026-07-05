@@ -6,11 +6,13 @@ import {
   createOrganizationAction,
   createOrganizationTaskAction,
   editOrganizationAction,
+  restoreOrganizationAction,
   type AddContactInput,
   type CreateOrganizationInput,
   type EditOrganizationInput
 } from "@/app/(app)/organizations/actions";
 import { ActivitySummarySection } from "@/components/crm/activity-timeline";
+import { ContactEditButton, type EditableContact } from "@/components/crm/contact-edit-modal";
 import { Pagination } from "@/components/crm/pagination";
 import { StatusBadge } from "@/components/crm/status-badge";
 import {
@@ -20,6 +22,7 @@ import {
 import { formatDate, formatEnumLabel, formatPipelineStageLabel } from "@/lib/crm/format";
 import type {
   OrganizationDetail,
+  OrganizationContactSummary,
   OrganizationDirectoryData,
   OrganizationDirectoryFilters,
   OrganizationFormOptions
@@ -87,6 +90,38 @@ function Modal({
       </div>
     </div>
   );
+}
+
+function organizationContactToEditableContact(contact: OrganizationContactSummary): EditableContact | null {
+  const subjectId = contact.personId ?? contact.departmentalContactId;
+  if (!subjectId) return null;
+  return {
+    contactCategory: contact.contactCategory,
+    contactRoleId: contact.contactRoleId,
+    department: contact.department,
+    displayName: contact.displayName,
+    email: {
+      id: contact.emailMethodId,
+      isPrimary: contact.emailMethodIsPrimary,
+      notes: contact.emailMethodNotes,
+      value: contact.email
+    },
+    firstName: contact.firstName,
+    label: contact.label,
+    lastName: contact.lastName,
+    note: contact.note,
+    operationalStatus: contact.operationalStatus,
+    phone: {
+      id: contact.phoneMethodId,
+      isPrimary: contact.phoneMethodIsPrimary,
+      notes: contact.phoneMethodNotes,
+      value: contact.phone
+    },
+    roleNote: contact.roleNote,
+    roleTitle: contact.roleTitleValue,
+    subjectId,
+    subjectType: contact.personId ? "person" : "department"
+  };
 }
 
 function toUrlSearchParams(params: Record<string, string | string[] | undefined>) {
@@ -800,15 +835,21 @@ export function OrganizationDetailWorkspace({
       <DetailSection title="Contacts summary" summary={`${detail.contacts.length} known · ${detail.primaryContact ? "Primary contact selected" : "No primary contact"}`}>
         {detail.contacts.length > 0 ? (
           <div className="space-y-2">
-            {detail.contacts.slice(0, 5).map((contact) => (
-              <div className="grid gap-2 border-b border-border py-2 text-sm md:grid-cols-[1fr_1fr]" key={contact.id}>
-                <div>
-                  <p className="font-medium text-text-heading">{contact.label}</p>
-                  <p className="text-text-muted">{contact.roleTitle ?? (contact.kind === "named_person" ? "Named person" : "Departmental contact")}</p>
+            {detail.contacts.slice(0, 5).map((contact) => {
+              const editableContact = organizationContactToEditableContact(contact);
+              return (
+                <div className="grid gap-2 border-b border-border py-2 text-sm md:grid-cols-[1fr_1fr]" key={contact.id}>
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium text-text-heading">{contact.label}</p>
+                      {editableContact ? <ContactEditButton contact={editableContact} /> : null}
+                    </div>
+                    <p className="text-text-muted">{contact.roleTitle ?? (contact.kind === "named_person" ? "Named person" : "Departmental contact")}</p>
+                  </div>
+                  <p className="text-text-muted">{[contact.email, contact.phone].filter(Boolean).join(" · ") || "No contact information"}</p>
                 </div>
-                <p className="text-text-muted">{[contact.email, contact.phone].filter(Boolean).join(" · ") || "No contact information"}</p>
-              </div>
-            ))}
+              );
+            })}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
               <p className="text-sm text-text-muted">Contacts are managed in the shared directory.</p>
               <Link
@@ -990,7 +1031,9 @@ export function OrganizationDetailWorkspace({
         )}
         {detail.organization.status !== "archived" ? (
           <ArchiveOrganizationForm organizationId={detail.organization.id} />
-        ) : null}
+        ) : (
+          <RestoreOrganizationForm organizationId={detail.organization.id} />
+        )}
       </DetailSection>
 
       {showEdit ? (
@@ -1239,6 +1282,43 @@ function AddTaskModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+export function RestoreOrganizationForm({ organizationId }: { organizationId: string }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="mt-4 rounded-card border border-border bg-surface-subtle p-3">
+      <p className="text-sm font-semibold text-text-heading">This organization is archived</p>
+      <p className="mt-1 text-sm text-text-muted">
+        Restoring returns it to normal outreach status. Contacts, tasks, opportunities, and activity history were
+        never affected by archiving and remain connected.
+      </p>
+      {error ? <p className="mt-2 text-sm text-red-800">{error}</p> : null}
+      <button
+        className={`${buttonClassName("primary")} mt-3`}
+        disabled={pending}
+        onClick={() => {
+          setError(null);
+          startTransition(async () => {
+            const result = await restoreOrganizationAction({ organizationId });
+            if ("success" in result) {
+              router.refresh();
+            } else if ("error" in result) {
+              setError(result.error);
+            } else {
+              setError(result.warning.message);
+            }
+          });
+        }}
+        type="button"
+      >
+        {pending ? "Restoring..." : "Restore organization"}
+      </button>
+    </div>
   );
 }
 

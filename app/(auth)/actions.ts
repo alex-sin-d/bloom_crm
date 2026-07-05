@@ -56,7 +56,7 @@ export async function signInAction(
 
   if (session.status !== "authorized") {
     await supabase.auth.signOut();
-    return { error: "This account is not an active authorized CRM owner." };
+    return { error: "This account is not an active authorized CRM user." };
   }
 
   redirect(nextPath);

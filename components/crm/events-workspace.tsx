@@ -13,9 +13,10 @@ import {
   updateEventAction
 } from "@/app/(app)/events/actions";
 import { ActivitySummarySection } from "@/components/crm/activity-timeline";
+import { ContactEditButton, type EditableContact } from "@/components/crm/contact-edit-modal";
 import { StatusBadge } from "@/components/crm/status-badge";
 import { eventDirectoryHref } from "@/lib/crm/event-logic";
-import type { EventDetail, EventDirectoryData, EventDirectoryFilters, EventFormOptions } from "@/lib/crm/event-queries";
+import type { EventContactSummary, EventDetail, EventDirectoryData, EventDirectoryFilters, EventFormOptions } from "@/lib/crm/event-queries";
 import { formatDate, formatEnumLabel } from "@/lib/crm/format";
 import type { CrmEnums, ProfileSummary } from "@/lib/crm/types";
 import Link from "next/link";
@@ -112,6 +113,37 @@ function firstValue(value: string | string[] | undefined) {
 
 function eventFilterHref(filters: EventDirectoryFilters, updates: Partial<EventDirectoryFilters>) {
   return eventDirectoryHref({ ...filters, ...updates });
+}
+
+function eventContactToEditableContact(contact: EventContactSummary): EditableContact | null {
+  if (!contact.subjectId || contact.subjectType === "unknown") return null;
+  return {
+    contactCategory: contact.contactCategory,
+    contactRoleId: contact.contactRoleId,
+    department: contact.department,
+    displayName: contact.displayName,
+    email: {
+      id: contact.emailMethodId,
+      isPrimary: contact.emailMethodIsPrimary,
+      notes: contact.emailMethodNotes,
+      value: contact.email
+    },
+    firstName: contact.firstName,
+    label: contact.label,
+    lastName: contact.lastName,
+    note: contact.note,
+    operationalStatus: contact.operationalStatus,
+    phone: {
+      id: contact.phoneMethodId,
+      isPrimary: contact.phoneMethodIsPrimary,
+      notes: contact.phoneMethodNotes,
+      value: contact.phone
+    },
+    roleNote: contact.roleNote,
+    roleTitle: contact.roleTitleValue,
+    subjectId: contact.subjectId,
+    subjectType: contact.subjectType
+  };
 }
 
 export function EventsWorkspace({ data, formOptions, rawParams }: EventsWorkspaceProps) {
@@ -759,19 +791,25 @@ function EventContactsSection({ detail, formOptions }: { detail: EventDetail; fo
       <SectionHeader title="Event contacts" />
       <div className="divide-y divide-border">
         {detail.contacts.length > 0 ? (
-          detail.contacts.map((contact) => (
-            <div className="px-4 py-3" key={contact.id}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-text-heading">
-                    {contact.href ? <Link href={contact.href}>{contact.label}</Link> : contact.label}
-                  </p>
-                  <p className="text-sm text-text-muted">{contact.roleTitle ?? contact.department ?? "Event contact"}</p>
+          detail.contacts.map((contact) => {
+            const editableContact = eventContactToEditableContact(contact);
+            return (
+              <div className="px-4 py-3" key={contact.id}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-text-heading">
+                      {contact.href ? <Link href={contact.href}>{contact.label}</Link> : contact.label}
+                    </p>
+                    <p className="text-sm text-text-muted">{contact.roleTitle ?? contact.department ?? "Event contact"}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <p className="text-right text-sm text-text-muted">{contact.email ?? contact.phone ?? "No method"}</p>
+                    {editableContact ? <ContactEditButton contact={editableContact} /> : null}
+                  </div>
                 </div>
-                <p className="text-right text-sm text-text-muted">{contact.email ?? contact.phone ?? "No method"}</p>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <p className="px-4 py-4 text-sm text-text-muted">No event contacts have been linked yet.</p>
         )}

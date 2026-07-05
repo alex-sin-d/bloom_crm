@@ -1,4 +1,5 @@
 import { StatusBadge } from "@/components/crm/status-badge";
+import { ContactEditButton, type EditableContact } from "@/components/crm/contact-edit-modal";
 import {
   formatApprovalRequirementLabel,
   formatApprovalStatusLabel,
@@ -318,30 +319,74 @@ export function ContactList({ contacts }: { contacts: ContactSummary[] }) {
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      {contacts.map((contact) => (
-        <article
-          className="rounded-control border border-border bg-surface-subtle p-3"
-          key={contact.id}
-        >
-          <h3 className="font-semibold text-text-heading">{contact.label}</h3>
-          <p className="mt-1 text-sm text-text-muted">
-            {contact.roleTitle ?? formatEnumLabel(contact.category)}
-          </p>
-          {contact.methods.length > 0 ? (
-            <ul className="mt-3 space-y-1 text-sm text-text-body">
-              {contact.methods.map((method) => (
-                <li key={method.id}>
-                  {formatEnumLabel(method.method_type)}: {method.parsed_value ?? method.raw_value}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-text-muted">No contact method linked.</p>
-          )}
-        </article>
-      ))}
+      {contacts.map((contact) => {
+        const editableContact = contactSummaryToEditableContact(contact);
+        return (
+          <article
+            className="rounded-control border border-border bg-surface-subtle p-3"
+            key={contact.id}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-semibold text-text-heading">{contact.label}</h3>
+              {editableContact ? <ContactEditButton contact={editableContact} /> : null}
+            </div>
+            <p className="mt-1 text-sm text-text-muted">
+              {contact.roleTitle ?? formatEnumLabel(contact.category)}
+            </p>
+            {contact.methods.length > 0 ? (
+              <ul className="mt-3 space-y-1 text-sm text-text-body">
+                {contact.methods.map((method) => (
+                  <li key={method.id}>
+                    {formatEnumLabel(method.method_type)}: {method.parsed_value ?? method.raw_value}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-text-muted">No contact method linked.</p>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
+}
+
+function contactSummaryToEditableContact(contact: ContactSummary): EditableContact | null {
+  const subjectId = contact.personId ?? contact.departmentalContactId;
+  if (!subjectId) return null;
+  const email = contact.methods.find((method) => method.method_type === "email") ?? null;
+  const phone = contact.methods.find((method) => method.method_type === "phone") ?? null;
+  return {
+    contactCategory: contact.contactRoleId ? (contact.category as EditableContact["contactCategory"]) : null,
+    contactRoleId: contact.contactRoleId,
+    department: contact.department,
+    displayName: contact.displayName,
+    email: email
+      ? {
+          id: email.id,
+          isPrimary: email.is_primary,
+          notes: email.notes,
+          value: email.parsed_value ?? email.raw_value
+        }
+      : null,
+    firstName: contact.firstName,
+    label: contact.label,
+    lastName: contact.lastName,
+    note: contact.note,
+    operationalStatus: contact.operationalStatus,
+    phone: phone
+      ? {
+          id: phone.id,
+          isPrimary: phone.is_primary,
+          notes: phone.notes,
+          value: phone.parsed_value ?? phone.raw_value
+        }
+      : null,
+    roleNote: contact.roleNote,
+    roleTitle: contact.roleTitleValue,
+    subjectId,
+    subjectType: contact.personId ? "person" : "department"
+  };
 }
 
 export function OpportunitySummaryList({ opportunities }: { opportunities: OpportunityListItem[] }) {

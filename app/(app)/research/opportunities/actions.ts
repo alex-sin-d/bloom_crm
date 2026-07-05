@@ -1,5 +1,6 @@
 "use server";
 
+import { APP_USER_PERMISSION_LEVELS } from "@/lib/auth/roles";
 import {
   ACTIVE_PIPELINE_RESEARCH_STATUS,
   INITIAL_ACTIVE_PIPELINE_STAGE,
@@ -93,7 +94,7 @@ export async function addToPipelineAction(formData: FormData) {
       .select("id")
       .eq("id", assignedOwnerId)
       .eq("status", "active")
-      .eq("permission_level", "owner")
+      .in("permission_level", [...APP_USER_PERMISSION_LEVELS])
       .maybeSingle();
 
     if (ownerError || !owner) {

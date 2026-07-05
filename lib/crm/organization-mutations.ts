@@ -1,4 +1,4 @@
-import { getProtectedSession } from "@/lib/auth/session";
+import { requireAppUser } from "@/lib/auth/authorize";
 import {
   buildDuplicateWarning,
   extractWebsiteDomain,
@@ -13,7 +13,6 @@ import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-que
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 type OrganizationInsert = Database["public"]["Tables"]["organizations"]["Insert"];
 type OrganizationUpdate = Database["public"]["Tables"]["organizations"]["Update"];
@@ -67,11 +66,12 @@ export type ArchiveOrganizationInput = {
   organizationId: string;
 };
 
+export type RestoreOrganizationInput = {
+  organizationId: string;
+};
+
 async function requireActiveOwner() {
-  const session = await getProtectedSession();
-  if (session.status === "unauthenticated") redirect("/sign-in");
-  if (session.status === "unauthorized") redirect("/unauthorized");
-  return session.profile;
+  return requireAppUser();
 }
 
 function cleanText(value: string | null | undefined) {
@@ -431,10 +431,12 @@ async function replaceOrganizationMethod(
 function revalidateOrganizationPaths(organizationId?: string) {
   revalidatePath("/organizations");
   revalidatePath("/dashboard");
+  revalidatePath("/university-outreach");
   if (organizationId) {
     revalidatePath(`/organizations/${organizationId}`);
     revalidatePath(`/school-outreach/divisions/${organizationId}`);
     revalidatePath(`/school-outreach/schools/${organizationId}`);
+    revalidatePath(`/university-outreach/institutions/${organizationId}`);
   }
 }
 
@@ -648,6 +650,55 @@ export async function archiveOrganization(
     return { success: true, organizationId: input.organizationId };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not archive organization." };
+  }
+}
+
+export async function restoreOrganization(
+  input: RestoreOrganizationInput
+): Promise<OrganizationActionResult> {
+  try {
+    const profile = await requireActiveOwner();
+    const supabase = await createServerSupabaseClient();
+    const { data: current, error: currentError } = await supabase
+      .from("organizations")
+      .select("id,status,archived_at")
+      .eq("id", input.organizationId)
+      .maybeSingle();
+
+    if (currentError || !current) {
+      return { error: currentError?.message ?? "Organization not found." };
+    }
+
+    if (!current.archived_at) {
+      return { success: true, organizationId: input.organizationId };
+    }
+
+    const updatePayload: OrganizationUpdate = {
+      archive_reason: null,
+      archived_at: null,
+      archived_by: null,
+      status: "research_only",
+      updated_by: profile.id
+    };
+
+    const { error } = await supabase
+      .from("organizations")
+      .update(updatePayload)
+      .eq("id", input.organizationId);
+
+    if (error) return { error: error.message };
+
+    await auditRecord(supabase, profile.id, "organizations", input.organizationId, {
+      after: updatePayload as Json,
+      before: { status: current.status, archived_at: current.archived_at },
+      reason: "Organization restored from archive",
+      type: "restore"
+    });
+
+    revalidateOrganizationPaths(input.organizationId);
+    return { success: true, organizationId: input.organizationId };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not restore organization." };
   }
 }
 

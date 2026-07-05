@@ -2130,6 +2130,67 @@ export type Database = {
           },
         ]
       }
+      university_outreach_profiles: {
+        Row: {
+          campus_count: number | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          institution_type: string | null
+          organization_id: string
+          priority_level: string | null
+          student_population: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          campus_count?: number | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          institution_type?: string | null
+          organization_id: string
+          priority_level?: string | null
+          student_population?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          campus_count?: number | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          institution_type?: string | null
+          organization_id?: string
+          priority_level?: string | null
+          student_population?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "university_outreach_profiles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "university_outreach_profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "university_outreach_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       people: {
         Row: {
           archive_reason: string | null
@@ -3345,6 +3406,8 @@ export type Database = {
     }
     Functions: {
       current_profile_is_active_owner: { Args: never; Returns: boolean }
+      current_profile_is_admin: { Args: never; Returns: boolean }
+      current_profile_role: { Args: never; Returns: string }
       normalize_label: { Args: { value: string }; Returns: string }
       record_reference_exists: {
         Args: { record_id: string; record_type_id: string }
@@ -3403,6 +3466,7 @@ export type Database = {
         | "score_override"
         | "import_update"
         | "conflict_resolution"
+        | "permanent_delete"
       backup_status:
         | "not_checked"
         | "matches_backup"
@@ -3641,7 +3705,7 @@ export type Database = {
         | "spoke_by_phone"
         | "call_back_requested"
         | "not_pursuing"
-      permission_level: "owner"
+      permission_level: "owner" | "admin" | "outreach_editor"
       pipeline_stage:
         | "research_only"
         | "ready_for_outreach"
@@ -3945,6 +4009,7 @@ export const Constants = {
         "score_override",
         "import_update",
         "conflict_resolution",
+        "permanent_delete",
       ],
       backup_status: [
         "not_checked",
@@ -4214,7 +4279,7 @@ export const Constants = {
         "call_back_requested",
         "not_pursuing",
       ],
-      permission_level: ["owner"],
+      permission_level: ["owner", "admin", "outreach_editor"],
       pipeline_stage: [
         "research_only",
         "ready_for_outreach",
@@ -4345,4 +4410,3 @@ export const Constants = {
     },
   },
 } as const
-

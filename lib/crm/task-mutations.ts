@@ -1,4 +1,5 @@
-import { getProtectedSession } from "@/lib/auth/session";
+import { requireAppUser } from "@/lib/auth/authorize";
+import { isAppUserPermissionLevel } from "@/lib/auth/roles";
 import { deriveNextReminderAfterCompletion } from "@/lib/crm/outreach-rules";
 import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import {
@@ -9,7 +10,6 @@ import {
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
@@ -44,10 +44,7 @@ export type RescheduleTaskInput = {
 };
 
 async function requireActiveOwner() {
-  const session = await getProtectedSession();
-  if (session.status === "unauthenticated") redirect("/sign-in");
-  if (session.status === "unauthorized") redirect("/unauthorized");
-  return session.profile;
+  return requireAppUser();
 }
 
 function cleanId(value: string | null | undefined) {
@@ -120,8 +117,8 @@ async function assertActiveOwnerProfile(
     .eq("id", ownerId)
     .maybeSingle();
 
-  if (error || !data || data.status !== "active" || data.permission_level !== "owner") {
-    throw new Error("Task owner must be an active owner.");
+  if (error || !data || data.status !== "active" || !isAppUserPermissionLevel(data.permission_level)) {
+    throw new Error("Task owner must be an active CRM user.");
   }
 
   return data.id;
@@ -275,8 +272,10 @@ function revalidateTaskPaths(task: Pick<TaskRow, "event_id" | "opportunity_id" |
   }
   if (task.organization_id) {
     revalidatePath("/school-outreach");
+    revalidatePath("/university-outreach");
     revalidatePath(`/school-outreach/divisions/${task.organization_id}`);
     revalidatePath(`/school-outreach/schools/${task.organization_id}`);
+    revalidatePath(`/university-outreach/institutions/${task.organization_id}`);
     revalidatePath(`/organizations/${task.organization_id}`);
   }
 }

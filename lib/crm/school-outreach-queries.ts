@@ -57,13 +57,24 @@ export type OutreachStatus = {
 
 export type ContactSummary = {
   category: ContactRoleRow["contact_category"] | "departmental_contact";
+  contactRoleId: string | null;
   currentStatus: ContactRoleRow["current_status"] | null;
+  department: string | null;
+  departmentalContactId: string | null;
+  displayName: string | null;
+  firstName: string | null;
   id: string;
   label: string;
+  lastName: string | null;
   methods: ContactMethodRow[];
+  note: string | null;
+  operationalStatus: ContactRoleRow["operational_or_influence_status"] | null;
   organizationId: string | null;
   opportunityId: string | null;
+  personId: string | null;
+  roleNote: string | null;
   roleTitle: string | null;
+  roleTitleValue: string | null;
 };
 
 export type SchoolRowSummary = {
@@ -659,7 +670,7 @@ function groupSchoolsByCity(schools: SchoolRowSummary[]) {
     .sort((left, right) => left.city.localeCompare(right.city));
 }
 
-async function loadContactSummaries(
+export async function loadContactSummaries(
   supabase: ServerSupabaseClient,
   {
     opportunityIds,
@@ -719,7 +730,7 @@ async function loadContactSummaries(
   const [peopleResult, roleMethodsResult, personMethodsResult, departmentMethodsResult] =
     await Promise.all([
       personIds.length
-        ? supabase.from("people").select("id,first_name,last_name").in("id", personIds)
+        ? supabase.from("people").select("id,first_name,last_name,notes").in("id", personIds)
         : Promise.resolve({ data: [], error: null }),
       roleIds.length
         ? supabase
@@ -749,12 +760,7 @@ async function loadContactSummaries(
   failOnError(personMethodsResult.error, "Could not load person contact methods.");
   failOnError(departmentMethodsResult.error, "Could not load departmental contact methods.");
 
-  const peopleById = new Map(
-    (peopleResult.data ?? []).map((person) => [
-      person.id,
-      [person.first_name, person.last_name].filter(Boolean).join(" ")
-    ])
-  );
+  const peopleById = new Map((peopleResult.data ?? []).map((person) => [person.id, person]));
   const departmentsById = new Map(departments.map((department) => [department.id, department]));
   const allMethods = [
     ...(roleMethodsResult.data ?? []),
@@ -762,11 +768,12 @@ async function loadContactSummaries(
     ...(departmentMethodsResult.data ?? [])
   ];
   const summaries: ContactSummary[] = roles.map((role) => {
+    const person = role.person_id ? peopleById.get(role.person_id) : null;
     const department = role.departmental_contact_id
       ? departmentsById.get(role.departmental_contact_id)
       : null;
     const label =
-      (role.person_id ? peopleById.get(role.person_id) : null) ??
+      (person ? [person.first_name, person.last_name].filter(Boolean).join(" ") : null) ??
       department?.display_name ??
       "Contact route";
     const methods = allMethods.filter(
@@ -779,13 +786,24 @@ async function loadContactSummaries(
 
     return {
       category: role.contact_category,
+      contactRoleId: role.id,
       currentStatus: role.current_status,
+      department: role.department ?? department?.department ?? department?.purpose ?? null,
+      departmentalContactId: role.departmental_contact_id,
+      displayName: department?.display_name ?? null,
+      firstName: person?.first_name ?? null,
       id: role.id,
       label,
+      lastName: person?.last_name ?? null,
       methods,
+      note: person?.notes ?? department?.notes ?? null,
+      operationalStatus: role.operational_or_influence_status,
       organizationId: role.organization_id,
       opportunityId: role.opportunity_id,
-      roleTitle: role.role_title ?? department?.department ?? null
+      personId: role.person_id,
+      roleNote: role.notes,
+      roleTitle: role.role_title ?? department?.department ?? null,
+      roleTitleValue: role.role_title
     };
   });
 
@@ -797,13 +815,24 @@ async function loadContactSummaries(
     if (!alreadyRepresented && department.organization_id && organizationIdSet.has(department.organization_id)) {
       summaries.push({
         category: "departmental_contact",
+        contactRoleId: null,
         currentStatus: null,
+        department: department.department ?? department.purpose,
+        departmentalContactId: department.id,
+        displayName: department.display_name,
+        firstName: null,
         id: department.id,
         label: department.display_name,
+        lastName: null,
         methods: allMethods.filter((method) => method.departmental_contact_id === department.id),
+        note: department.notes,
+        operationalStatus: null,
         organizationId: department.organization_id,
         opportunityId: null,
-        roleTitle: department.department ?? department.purpose
+        personId: null,
+        roleNote: null,
+        roleTitle: department.department ?? department.purpose,
+        roleTitleValue: null
       });
     }
   }
@@ -833,7 +862,7 @@ const TRUSTEE_CATEGORIES: Set<ContactRoleRow["contact_category"]> = new Set([
  * Trustees: contacts with approval_authority or influence category.
  * Other: remaining contacts with no usable methods.
  */
-function groupContactsByKind(contacts: ContactSummary[]): ContactGroup[] {
+export function groupContactsByKind(contacts: ContactSummary[]): ContactGroup[] {
   const operational: ContactSummary[] = [];
   const other: ContactSummary[] = [];
   const trustees: ContactSummary[] = [];
@@ -869,7 +898,7 @@ function groupContactsByKind(contacts: ContactSummary[]): ContactGroup[] {
 /**
  * Load the organization_outreach row and resolve primary/backup contact details.
  */
-async function loadOutreachSummary(
+export async function loadOutreachSummary(
   supabase: ServerSupabaseClient,
   organizationId: string,
   allActivities: ActivityRow[],
@@ -982,7 +1011,7 @@ async function loadOutreachSummary(
 /**
  * Load the per-user collapse preferences from profile_preferences.
  */
-async function loadCollapsePreferences(
+export async function loadCollapsePreferences(
   supabase: ServerSupabaseClient,
   profileId: string
 ): Promise<Json | null> {

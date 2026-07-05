@@ -28,6 +28,7 @@ import {
   type OrganizationSort
 } from "@/lib/crm/organization-logic";
 import { formatDate, formatDateTime, formatPipelineStageLabel } from "@/lib/crm/format";
+import { getOpportunityWorkspaceHref } from "@/lib/crm/outreach-labels";
 import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import { getLocalTodayString } from "@/lib/crm/task-logic";
 import type {
@@ -140,13 +141,31 @@ export type OrganizationFormOptions = {
 };
 
 export type OrganizationContactSummary = {
+  contactCategory: ContactRoleRow["contact_category"] | null;
+  contactRoleId: string | null;
+  department: string | null;
+  departmentalContactId: string | null;
+  displayName: string | null;
   email: string | null;
+  emailMethodId: string | null;
+  emailMethodIsPrimary: boolean;
+  emailMethodNotes: string | null;
+  firstName: string | null;
   hasContactInfo: boolean;
   id: string;
   kind: "named_person" | "departmental_contact";
   label: string;
+  lastName: string | null;
+  note: string | null;
+  operationalStatus: ContactRoleRow["operational_or_influence_status"] | null;
+  personId: string | null;
   phone: string | null;
+  phoneMethodId: string | null;
+  phoneMethodIsPrimary: boolean;
+  phoneMethodNotes: string | null;
+  roleNote: string | null;
   roleTitle: string | null;
+  roleTitleValue: string | null;
 };
 
 export type OrganizationTaskSummary = {
@@ -525,9 +544,17 @@ function fullName(person: Pick<PersonRow, "first_name" | "last_name"> | null | u
 }
 
 function chooseMethod(methods: ContactMethodRow[], methodType: "email" | "phone") {
+  return contactMethodValue(chooseMethodRow(methods, methodType));
+}
+
+function chooseMethodRow(methods: ContactMethodRow[], methodType: "email" | "phone") {
   const method = methods
     .filter((candidate) => candidate.method_type === methodType)
     .sort((left, right) => Number(right.is_primary) - Number(left.is_primary))[0];
+  return method ?? null;
+}
+
+function contactMethodValue(method: ContactMethodRow | null) {
   return method?.parsed_value ?? method?.raw_value ?? null;
 }
 
@@ -553,16 +580,37 @@ function getContactSummaries(data: OrganizationDataset) {
         ? methodsByDepartmentId.get(role.departmental_contact_id) ?? []
         : [])
     ];
+    const person = role.person_id ? peopleById.get(role.person_id) ?? null : null;
+    const emailMethod = chooseMethodRow(methods, "email");
+    const phoneMethod = chooseMethodRow(methods, "phone");
     const contact: OrganizationContactSummary = {
-      email: chooseMethod(methods, "email"),
+      contactCategory: role.contact_category,
+      contactRoleId: role.id,
+      department: role.department ?? department?.department ?? department?.purpose ?? null,
+      departmentalContactId: role.departmental_contact_id,
+      displayName: department?.display_name ?? null,
+      email: contactMethodValue(emailMethod),
+      emailMethodId: emailMethod?.id ?? null,
+      emailMethodIsPrimary: emailMethod?.is_primary ?? false,
+      emailMethodNotes: emailMethod?.notes ?? null,
+      firstName: person?.first_name ?? null,
       hasContactInfo: methods.some((method) => method.method_type === "email" || method.method_type === "phone"),
       id: role.id,
       kind: role.person_id ? "named_person" : "departmental_contact",
       label: role.person_id
-        ? fullName(peopleById.get(role.person_id))
+        ? fullName(person)
         : department?.display_name ?? "Contact route",
-      phone: chooseMethod(methods, "phone"),
-      roleTitle: role.role_title ?? role.department ?? department?.department ?? null
+      lastName: person?.last_name ?? null,
+      note: person?.notes ?? department?.notes ?? null,
+      operationalStatus: role.operational_or_influence_status,
+      personId: role.person_id,
+      phone: contactMethodValue(phoneMethod),
+      phoneMethodId: phoneMethod?.id ?? null,
+      phoneMethodIsPrimary: phoneMethod?.is_primary ?? false,
+      phoneMethodNotes: phoneMethod?.notes ?? null,
+      roleNote: role.notes,
+      roleTitle: role.role_title ?? role.department ?? department?.department ?? null,
+      roleTitleValue: role.role_title
     };
 
     summariesByOrg.set(organizationId, [...(summariesByOrg.get(organizationId) ?? []), contact]);
@@ -576,16 +624,36 @@ function getContactSummaries(data: OrganizationDataset) {
     if (alreadyRepresented) continue;
 
     const methods = methodsByDepartmentId.get(department.id) ?? [];
+    const emailMethod = chooseMethodRow(methods, "email");
+    const phoneMethod = chooseMethodRow(methods, "phone");
     summariesByOrg.set(department.organization_id, [
       ...(summariesByOrg.get(department.organization_id) ?? []),
       {
-        email: chooseMethod(methods, "email"),
+        contactCategory: null,
+        contactRoleId: null,
+        department: department.department ?? department.purpose,
+        departmentalContactId: department.id,
+        displayName: department.display_name,
+        email: contactMethodValue(emailMethod),
+        emailMethodId: emailMethod?.id ?? null,
+        emailMethodIsPrimary: emailMethod?.is_primary ?? false,
+        emailMethodNotes: emailMethod?.notes ?? null,
+        firstName: null,
         hasContactInfo: methods.length > 0,
         id: department.id,
         kind: "departmental_contact",
         label: department.display_name,
-        phone: chooseMethod(methods, "phone"),
-        roleTitle: department.department ?? department.purpose
+        lastName: null,
+        note: department.notes,
+        operationalStatus: null,
+        personId: null,
+        phone: contactMethodValue(phoneMethod),
+        phoneMethodId: phoneMethod?.id ?? null,
+        phoneMethodIsPrimary: phoneMethod?.is_primary ?? false,
+        phoneMethodNotes: phoneMethod?.notes ?? null,
+        roleNote: null,
+        roleTitle: department.department ?? department.purpose,
+        roleTitleValue: null
       }
     ]);
   }
@@ -1345,11 +1413,10 @@ export async function getOrganizationDetail(
       active: isActiveOpportunity(opportunity),
       followUpDate: opportunity.follow_up_date,
       href:
-        opportunity.opportunity_type === "school"
-          ? `/school-outreach/schools/${opportunity.primary_organization_id}`
-          : opportunity.opportunity_type === "division"
-            ? `/school-outreach/divisions/${opportunity.primary_organization_id}`
-            : `/opportunities/${opportunity.id}`,
+        getOpportunityWorkspaceHref(
+          opportunity.opportunity_type,
+          opportunity.primary_organization_id
+        ) ?? `/opportunities/${opportunity.id}`,
       id: opportunity.id,
       name: opportunity.opportunity_name,
       pipelineStage: opportunity.pipeline_stage,

@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/crm/page-header";
-import { requireAuthorizedSession } from "@/lib/auth/session";
+import { requireAppUser } from "@/lib/auth/authorize";
+import { PERMISSIONS, roleHasPermission } from "@/lib/auth/roles";
 import { devToolsEnabled } from "@/lib/config/feature-visibility";
 import Link from "next/link";
 
@@ -77,8 +78,17 @@ function ToolCard({ badge, tool }: { badge?: string; tool: AdminToolLink }) {
   );
 }
 
+const adminOnlyTools: AdminToolLink[] = [
+  {
+    description: "Add, remove, or change the role of Alex and Sam's accounts.",
+    href: "/admin-tools/users",
+    label: "Manage users"
+  }
+];
+
 export default async function AdminToolsPage() {
-  await requireAuthorizedSession();
+  const profile = await requireAppUser();
+  const isAdmin = roleHasPermission(profile.role, PERMISSIONS.MANAGE_USERS);
   const showDevelopmentTools = devToolsEnabled();
 
   return (
@@ -92,7 +102,7 @@ export default async function AdminToolsPage() {
         <section>
           <h2 className="text-base font-semibold text-text-heading">Business administration</h2>
           <p className="mt-1 text-sm text-text-muted">
-            Available to both owners. Useful occasionally, not needed every day.
+            Available to every CRM user. Useful occasionally, not needed every day.
           </p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {businessTools.map((tool) => (
@@ -100,6 +110,20 @@ export default async function AdminToolsPage() {
             ))}
           </div>
         </section>
+
+        {isAdmin ? (
+          <section>
+            <h2 className="text-base font-semibold text-text-heading">Administrator only</h2>
+            <p className="mt-1 text-sm text-text-muted">
+              Only visible to administrators. Access is also enforced on the page itself, not just this link.
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {adminOnlyTools.map((tool) => (
+                <ToolCard badge="Admin" key={tool.href} tool={tool} />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {showDevelopmentTools ? (
           <section>

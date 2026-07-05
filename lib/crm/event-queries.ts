@@ -1,3 +1,4 @@
+import { APP_USER_PERMISSION_LEVELS } from "@/lib/auth/roles";
 import { getActivityTimeline } from "@/lib/crm/activity-queries";
 import {
   EVENT_DIRECTORY_PAGE_SIZE,
@@ -28,6 +29,10 @@ import { formatApprovalStatusLabel, formatDate, formatEnumLabel } from "@/lib/cr
 import { failOnError, numberParam, selectInChunks, stringParam, uniqueValues } from "@/lib/crm/query-utils";
 import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import { getLocalTodayString, isOpenTaskStatus } from "@/lib/crm/task-logic";
+import {
+  getUniversityOutreachHref,
+  isUniversityOutreachOrganizationType
+} from "@/lib/crm/university-outreach-logic";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { ActivityTimelineEvent } from "@/lib/crm/activity-timeline";
@@ -102,13 +107,29 @@ export type EventFormOptions = {
 };
 
 export type EventContactSummary = {
+  contactCategory: ContactRoleRow["contact_category"] | null;
+  contactRoleId: string | null;
   department: string | null;
+  departmentalContactId: string | null;
+  displayName: string | null;
   email: string | null;
+  emailMethodId: string | null;
+  emailMethodIsPrimary: boolean;
+  emailMethodNotes: string | null;
+  firstName: string | null;
   href: string | null;
   id: string;
   label: string;
+  lastName: string | null;
+  note: string | null;
+  operationalStatus: ContactRoleRow["operational_or_influence_status"] | null;
   phone: string | null;
+  phoneMethodId: string | null;
+  phoneMethodIsPrimary: boolean;
+  phoneMethodNotes: string | null;
+  roleNote: string | null;
   roleTitle: string | null;
+  roleTitleValue: string | null;
   subjectId: string | null;
   subjectType: "department" | "person" | "unknown";
 };
@@ -353,7 +374,7 @@ export async function getEventFormOptions(client?: ServerSupabaseClient): Promis
         .from("profiles")
         .select("id,email,display_name")
         .eq("status", "active")
-        .eq("permission_level", "owner")
+        .in("permission_level", [...APP_USER_PERMISSION_LEVELS])
         .order("display_name", { ascending: true, nullsFirst: false })
     ]);
 
@@ -965,9 +986,19 @@ async function buildEventContacts(
     const label = person ? personName(person) : department?.display_name ?? role.role_title ?? "Unknown contact";
     const subjectType = person ? "person" : department ? "department" : "unknown";
     const subjectId = person?.id ?? department?.id ?? null;
+    const emailMethod = chooseMethodRow(methods, "email");
+    const phoneMethod = chooseMethodRow(methods, "phone");
     return {
-      department: role.department,
-      email: chooseMethodValue(methods, "email"),
+      contactCategory: role.contact_category,
+      contactRoleId: role.id,
+      department: role.department ?? department?.department ?? department?.purpose ?? null,
+      departmentalContactId: role.departmental_contact_id,
+      displayName: department?.display_name ?? null,
+      email: contactMethodValue(emailMethod),
+      emailMethodId: emailMethod?.id ?? null,
+      emailMethodIsPrimary: emailMethod?.is_primary ?? false,
+      emailMethodNotes: emailMethod?.notes ?? null,
+      firstName: person?.first_name ?? null,
       href:
         subjectType === "person" && subjectId
           ? `/contacts/people/${subjectId}`
@@ -976,8 +1007,16 @@ async function buildEventContacts(
             : null,
       id: role.id,
       label,
-      phone: chooseMethodValue(methods, "phone"),
+      lastName: person?.last_name ?? null,
+      note: person?.notes ?? department?.notes ?? null,
+      operationalStatus: role.operational_or_influence_status,
+      phone: contactMethodValue(phoneMethod),
+      phoneMethodId: phoneMethod?.id ?? null,
+      phoneMethodIsPrimary: phoneMethod?.is_primary ?? false,
+      phoneMethodNotes: phoneMethod?.notes ?? null,
+      roleNote: role.notes,
       roleTitle: role.role_title,
+      roleTitleValue: role.role_title,
       subjectId,
       subjectType
     };
@@ -1113,7 +1152,9 @@ function toOpportunitySummary(opportunity: OpportunityRow): EventOpportunitySumm
         ? `/school-outreach/schools/${opportunity.primary_organization_id}`
         : opportunity.opportunity_type === "division" && opportunity.primary_organization_id
           ? `/school-outreach/divisions/${opportunity.primary_organization_id}`
-          : `/opportunities/${opportunity.id}`
+          : opportunity.opportunity_type === "university" && opportunity.primary_organization_id
+            ? getUniversityOutreachHref(opportunity.primary_organization_id)
+            : `/opportunities/${opportunity.id}`
   };
 }
 
@@ -1139,6 +1180,9 @@ function getEventDateLabel(event: Pick<EventRow, "date_status" | "event_date" | 
 function getOrganizationWorkspaceHref(organization: Pick<OrganizationRow, "id" | "organization_type">) {
   if (organization.organization_type === "school") return `/school-outreach/schools/${organization.id}`;
   if (organization.organization_type === "school_division") return `/school-outreach/divisions/${organization.id}`;
+  if (isUniversityOutreachOrganizationType(organization.organization_type)) {
+    return getUniversityOutreachHref(organization.id);
+  }
   return `/organizations/${organization.id}`;
 }
 
@@ -1172,10 +1216,14 @@ function personName(person: Pick<PersonRow, "first_name" | "last_name">) {
   return [person.first_name, person.last_name].filter(Boolean).join(" ").trim() || "Unnamed person";
 }
 
-function chooseMethodValue(methods: ContactMethodRow[], methodType: "email" | "phone") {
+function chooseMethodRow(methods: ContactMethodRow[], methodType: "email" | "phone") {
   const method = methods
     .filter((candidate) => candidate.method_type === methodType)
     .sort((left, right) => Number(right.is_primary) - Number(left.is_primary) || left.created_at.localeCompare(right.created_at))[0];
+  return method ?? null;
+}
+
+function contactMethodValue(method: ContactMethodRow | null) {
   return method?.normalized_value ?? method?.raw_value ?? null;
 }
 

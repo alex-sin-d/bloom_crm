@@ -14,6 +14,11 @@ import {
   getOutreachStatusLabel,
   type OutreachStatusTone
 } from "@/lib/crm/outreach-labels";
+import {
+  getUniversityOutreachHref,
+  isUniversityOutreachOrganizationType,
+  UNIVERSITY_OUTREACH_ORGANIZATION_TYPES
+} from "@/lib/crm/university-outreach-logic";
 import type {
   ActivityRow,
   CrmEnums,
@@ -62,6 +67,7 @@ export type DashboardSummary = {
   outreachNeedingAttention: OutreachAttentionItem[];
   overdueFollowUpCount: number;
   recentOutreach: ActivityTimelineEvent[];
+  universityOutreachCount: number;
 };
 
 async function countActivePipeline(supabase: ServerSupabaseClient) {
@@ -73,6 +79,17 @@ async function countActivePipeline(supabase: ServerSupabaseClient) {
     .neq("pipeline_stage", "research_only");
 
   failOnError(error, "Could not count active outreach opportunities.");
+  return count ?? 0;
+}
+
+async function countUniversityOutreachRecords(supabase: ServerSupabaseClient) {
+  const { count, error } = await supabase
+    .from("organizations")
+    .select("id", { count: "exact", head: true })
+    .is("archived_at", null)
+    .in("organization_type", [...UNIVERSITY_OUTREACH_ORGANIZATION_TYPES]);
+
+  failOnError(error, "Could not count university outreach records.");
   return count ?? 0;
 }
 
@@ -101,6 +118,9 @@ function organizationWorkspaceHref(
   if (organizationType === "school") return `/school-outreach/schools/${organizationId}`;
   if (organizationType === "school_division") {
     return `/school-outreach/divisions/${organizationId}`;
+  }
+  if (isUniversityOutreachOrganizationType(organizationType)) {
+    return getUniversityOutreachHref(organizationId);
   }
   return `/organizations/${organizationId}`;
 }
@@ -346,7 +366,8 @@ export async function getDashboardSummary(
       nextTasks: [],
       outreachNeedingAttention: [],
       overdueFollowUpCount: 0,
-      recentOutreach: []
+      recentOutreach: [],
+      universityOutreachCount: 0
     };
   }
 
@@ -359,14 +380,16 @@ export async function getDashboardSummary(
     overdueFollowUpCount,
     activeOutreachCount,
     outreachAttention,
-    recentOutreach
+    recentOutreach,
+    universityOutreachCount
   ] = await Promise.all([
     getDashboardTaskSnapshot(supabase, currentProfileId, today),
     countFollowUps(supabase, today, "today"),
     countFollowUps(supabase, today, "overdue"),
     countActivePipeline(supabase),
     getOutreachNeedingAttention(supabase),
-    getRecentOutreach(supabase)
+    getRecentOutreach(supabase),
+    countUniversityOutreachRecords(supabase)
   ]);
 
   return {
@@ -376,6 +399,7 @@ export async function getDashboardSummary(
     nextTasks: taskSnapshot.nextTasks,
     outreachNeedingAttention: outreachAttention.items,
     overdueFollowUpCount,
-    recentOutreach
+    recentOutreach,
+    universityOutreachCount
   };
 }

@@ -45,7 +45,7 @@ function MetricCard({
 export function DashboardPanels({ summary }: { summary: DashboardSummary }) {
   return (
     <div className="space-y-6">
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           href="/tasks?view=today"
           label="Follow-ups due today"
@@ -75,6 +75,13 @@ export function DashboardPanels({ summary }: { summary: DashboardSummary }) {
           description="Organizations that have been contacted and have not replied yet."
           actionLabel="View active opportunities"
           value={summary.awaitingReplyCount}
+        />
+        <MetricCard
+          href="/university-outreach"
+          label="University Outreach"
+          description="University and postsecondary institution records."
+          actionLabel="Open University Outreach"
+          value={summary.universityOutreachCount}
         />
       </section>
 

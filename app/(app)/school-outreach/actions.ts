@@ -1,6 +1,6 @@
 "use server";
 
-import { getProtectedSession } from "@/lib/auth/session";
+import { requireAppUser } from "@/lib/auth/authorize";
 import { deriveOutreachRuleResult } from "@/lib/crm/outreach-rules";
 import { mergeCollapseState } from "@/lib/crm/collapse-preferences";
 import {
@@ -13,7 +13,6 @@ import { getRecordTypeId } from "@/lib/crm/shared-queries";
 import { completeTaskById } from "@/lib/crm/task-mutations";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import type { Database } from "@/lib/supabase/database.types";
 
 type OutreachRoute = Database["public"]["Enums"]["outreach_route"];
@@ -22,10 +21,7 @@ type OutreachStatus = Database["public"]["Enums"]["outreach_status"];
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function requireActiveOwner() {
-  const session = await getProtectedSession();
-  if (session.status === "unauthenticated") redirect("/sign-in");
-  if (session.status === "unauthorized") redirect("/unauthorized");
-  return session.profile;
+  return requireAppUser();
 }
 
 async function upsertOrganizationOutreach(
@@ -61,9 +57,12 @@ async function upsertOrganizationOutreach(
 function revalidateOutreachPaths(organizationId: string) {
   revalidatePath(`/school-outreach/divisions/${organizationId}`);
   revalidatePath(`/school-outreach/schools/${organizationId}`);
+  revalidatePath(`/university-outreach/institutions/${organizationId}`);
   revalidatePath("/school-outreach");
+  revalidatePath("/university-outreach");
   revalidatePath(`/organizations/${organizationId}`);
   revalidatePath("/organizations");
+  revalidatePath("/dashboard");
 }
 
 // ── Choose primary / backup contact ──────────────────────────────────────────

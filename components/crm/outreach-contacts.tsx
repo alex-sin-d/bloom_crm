@@ -1,6 +1,7 @@
 "use client";
 
 import { StatusBadge } from "@/components/crm/status-badge";
+import { ContactEditButton, type EditableContact } from "@/components/crm/contact-edit-modal";
 import {
   addContactAction,
   changeOutreachStatusAction,
@@ -37,6 +38,7 @@ import Link from "next/link";
 
 type OutreachStatus = Database["public"]["Enums"]["outreach_status"];
 type OutreachRoute = Database["public"]["Enums"]["outreach_route"];
+type OutreachRouteOption = { value: OutreachRoute; label: string };
 
 // ── Small icon helpers ─────────────────────────────────────────────────────────
 
@@ -260,6 +262,7 @@ function ContactsAndOutreachSummaryGrid({
   organizationId,
   outreachSummary,
   contactRoleOptions,
+  routeOptions,
   workspacePath
 }: {
   activatableOpportunityId: string | null;
@@ -267,6 +270,7 @@ function ContactsAndOutreachSummaryGrid({
   organizationId: string;
   outreachSummary: OutreachSummary;
   contactRoleOptions: Array<{ id: string; label: string }>;
+  routeOptions?: OutreachRouteOption[];
   workspacePath: string;
 }) {
   const { outreachRow, primaryContact, backupContact, lastContactAt, nextFollowUp } =
@@ -302,6 +306,7 @@ function ContactsAndOutreachSummaryGrid({
             <OutreachRoutePicker
               organizationId={organizationId}
               current={outreachRow?.outreach_route ?? "not_decided"}
+              options={routeOptions}
             />
           ) : (
             <span className="text-sm text-text-muted">Not decided</span>
@@ -419,7 +424,7 @@ function PrimaryContactPicker({
 
 // ── Outreach route picker ─────────────────────────────────────────────────────
 
-const ROUTE_OPTIONS: Array<{ value: OutreachRoute; label: string }> = [
+const ROUTE_OPTIONS: OutreachRouteOption[] = [
   { value: "not_decided", label: "Not decided" },
   { value: "division_first", label: "Division first" },
   { value: "school_directly", label: "School directly" },
@@ -428,10 +433,12 @@ const ROUTE_OPTIONS: Array<{ value: OutreachRoute; label: string }> = [
 
 function OutreachRoutePicker({
   organizationId,
-  current
+  current,
+  options = ROUTE_OPTIONS
 }: {
   organizationId: string;
   current: OutreachRoute;
+  options?: OutreachRouteOption[];
 }) {
   const [value, setValue] = useState(current);
   const [, startTransition] = useTransition();
@@ -450,7 +457,7 @@ function OutreachRoutePicker({
       onChange={handleChange}
       value={value}
     >
-      {ROUTE_OPTIONS.map((opt) => (
+      {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
           {opt.label}
         </option>
@@ -759,9 +766,11 @@ type ContactKind = "named_person" | "department";
 
 function AddContactModal({
   organizationId,
+  sourcePlaceholder = "e.g. school website, LinkedIn",
   onClose
 }: {
   organizationId: string;
+  sourcePlaceholder?: string;
   onClose: () => void;
 }) {
   const [kind, setKind] = useState<ContactKind | null>(null);
@@ -867,6 +876,7 @@ function AddContactModal({
           onBack={() => setKind(null)}
           onSubmit={handleSubmit}
           error={error}
+          sourcePlaceholder={sourcePlaceholder}
         />
       ) : (
         <DepartmentContactForm
@@ -874,6 +884,7 @@ function AddContactModal({
           onBack={() => setKind(null)}
           onSubmit={handleSubmit}
           error={error}
+          sourcePlaceholder={sourcePlaceholder}
         />
       )}
     </ModalOverlay>
@@ -884,12 +895,14 @@ function NamedPersonForm({
   organizationId,
   onBack,
   onSubmit,
-  error
+  error,
+  sourcePlaceholder
 }: {
   organizationId: string;
   onBack: () => void;
   onSubmit: (input: AddContactInput) => void;
   error: string | null;
+  sourcePlaceholder: string;
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -1004,11 +1017,11 @@ function NamedPersonForm({
         />
       </label>
       <label className="block">
-        <span className="block text-xs font-semibold text-text-muted">Source (optional — where did you find this contact?)</span>
+          <span className="block text-xs font-semibold text-text-muted">Source (optional — where did you find this contact?)</span>
         <input
           className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
           onChange={(e) => setSource(e.target.value)}
-          placeholder="e.g. school website, LinkedIn"
+          placeholder={sourcePlaceholder}
           type="text"
           value={source}
         />
@@ -1030,12 +1043,14 @@ function DepartmentContactForm({
   organizationId,
   onBack,
   onSubmit,
-  error
+  error,
+  sourcePlaceholder
 }: {
   organizationId: string;
   onBack: () => void;
   onSubmit: (input: AddContactInput) => void;
   error: string | null;
+  sourcePlaceholder: string;
 }) {
   const [displayName, setDisplayName] = useState("");
   const [func, setFunc] = useState("");
@@ -1129,7 +1144,7 @@ function DepartmentContactForm({
         <input
           className="mt-1 h-9 w-full rounded-control border border-border bg-white px-2 text-sm"
           onChange={(e) => setSource(e.target.value)}
-          placeholder="e.g. school website, LinkedIn"
+          placeholder={sourcePlaceholder}
           type="text"
           value={source}
         />
@@ -1254,6 +1269,7 @@ function ContactRow({
 }) {
   const email = contact.methods.find((m) => m.method_type === "email");
   const phone = contact.methods.find((m) => m.method_type === "phone");
+  const editableContact = contactSummaryToEditableContact(contact);
 
   return (
     <div className="grid gap-1 px-3 py-2.5 text-sm sm:grid-cols-[1fr_auto]">
@@ -1280,8 +1296,51 @@ function ContactRow({
           ) : null}
         </div>
       </div>
+      {editableContact ? (
+        <div className="sm:justify-self-end">
+          <ContactEditButton contact={editableContact} />
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function contactSummaryToEditableContact(contact: ContactSummary): EditableContact | null {
+  const subjectId = contact.personId ?? contact.departmentalContactId;
+  if (!subjectId) return null;
+  const email = contact.methods.find((method) => method.method_type === "email") ?? null;
+  const phone = contact.methods.find((method) => method.method_type === "phone") ?? null;
+  return {
+    contactCategory: contact.contactRoleId ? (contact.category as EditableContact["contactCategory"]) : null,
+    contactRoleId: contact.contactRoleId,
+    department: contact.department,
+    displayName: contact.displayName,
+    email: email
+      ? {
+          id: email.id,
+          isPrimary: email.is_primary,
+          notes: email.notes,
+          value: email.parsed_value ?? email.raw_value
+        }
+      : null,
+    firstName: contact.firstName,
+    label: contact.label,
+    lastName: contact.lastName,
+    note: contact.note,
+    operationalStatus: contact.operationalStatus,
+    phone: phone
+      ? {
+          id: phone.id,
+          isPrimary: phone.is_primary,
+          notes: phone.notes,
+          value: phone.parsed_value ?? phone.raw_value
+        }
+      : null,
+    roleNote: contact.roleNote,
+    roleTitle: contact.roleTitleValue,
+    subjectId,
+    subjectType: contact.personId ? "person" : "department"
+  };
 }
 
 // ── School contacts section (school page: school vs division) ─────────────────
@@ -1335,6 +1394,8 @@ export function DivisionContactsAndOutreach({
   organizationId,
   outreachSummary,
   preferences,
+  routeOptions,
+  sourcePlaceholder,
   workspacePath
 }: {
   activatableOpportunityId: string | null;
@@ -1345,6 +1406,8 @@ export function DivisionContactsAndOutreach({
   organizationId: string;
   outreachSummary: OutreachSummary;
   preferences: Json | null | undefined;
+  routeOptions?: OutreachRouteOption[];
+  sourcePlaceholder?: string;
   workspacePath: string;
 }) {
   const [addOpen, setAddOpen] = useState(false);
@@ -1373,6 +1436,7 @@ export function DivisionContactsAndOutreach({
           organizationId={organizationId}
           outreachSummary={outreachSummary}
           contactRoleOptions={contactRoleOptions}
+          routeOptions={routeOptions}
           workspacePath={workspacePath}
         />
 
@@ -1403,7 +1467,11 @@ export function DivisionContactsAndOutreach({
       </div>
 
       {addOpen ? (
-        <AddContactModal organizationId={organizationId} onClose={() => setAddOpen(false)} />
+        <AddContactModal
+          organizationId={organizationId}
+          onClose={() => setAddOpen(false)}
+          sourcePlaceholder={sourcePlaceholder}
+        />
       ) : null}
 
       {logOpen ? (
@@ -1434,6 +1502,8 @@ export function SchoolContactsAndOutreach({
   organizationId,
   outreachSummary,
   preferences,
+  routeOptions,
+  sourcePlaceholder,
   workspacePath
 }: {
   activatableOpportunityId: string | null;
@@ -1444,6 +1514,8 @@ export function SchoolContactsAndOutreach({
   organizationId: string;
   outreachSummary: OutreachSummary;
   preferences: Json | null | undefined;
+  routeOptions?: OutreachRouteOption[];
+  sourcePlaceholder?: string;
   workspacePath: string;
 }) {
   const [addOpen, setAddOpen] = useState(false);
@@ -1472,6 +1544,7 @@ export function SchoolContactsAndOutreach({
           organizationId={organizationId}
           outreachSummary={outreachSummary}
           contactRoleOptions={contactRoleOptions}
+          routeOptions={routeOptions}
           workspacePath={workspacePath}
         />
 
@@ -1502,7 +1575,11 @@ export function SchoolContactsAndOutreach({
       </div>
 
       {addOpen ? (
-        <AddContactModal organizationId={organizationId} onClose={() => setAddOpen(false)} />
+        <AddContactModal
+          organizationId={organizationId}
+          onClose={() => setAddOpen(false)}
+          sourcePlaceholder={sourcePlaceholder}
+        />
       ) : null}
 
       {logOpen ? (

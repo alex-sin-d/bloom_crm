@@ -33,6 +33,10 @@ import { formatDate, formatDateTime, formatEnumLabel } from "@/lib/crm/format";
 import { failOnError, numberParam, selectInChunks, stringParam, uniqueValues } from "@/lib/crm/query-utils";
 import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import { getLocalTodayString } from "@/lib/crm/task-logic";
+import {
+  getUniversityOutreachHref,
+  isUniversityOutreachOrganizationType
+} from "@/lib/crm/university-outreach-logic";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type {
@@ -60,12 +64,26 @@ export type ContactDirectoryFilters = ContactDirectoryLogicFilters & {
 
 export type ContactDirectoryItem = ContactDirectoryLogicItem & {
   backupFor: string[];
+  contactCategory: ContactRoleRow["contact_category"] | null;
   contactHref: string;
+  contactRoleId: string | null;
   copiedValue?: string;
+  department: string | null;
+  displayName: string | null;
   emailMethodId: string | null;
+  emailMethodIsPrimary: boolean;
+  emailMethodNotes: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  notes: string | null;
+  operationalStatus: ContactRoleRow["operational_or_influence_status"] | null;
   organizationSummary: string;
   phoneMethodId: string | null;
+  phoneMethodIsPrimary: boolean;
+  phoneMethodNotes: string | null;
   primaryFor: string[];
+  roleNotes: string | null;
+  roleTitle: string | null;
   subjectId: string;
   subjectType: ContactSubjectKind;
   workspaceHref: string | null;
@@ -109,6 +127,7 @@ export type ContactRoleDetail = {
   id: string;
   notes: string | null;
   operationalLabel: string;
+  operationalStatus: ContactRoleRow["operational_or_influence_status"];
   organization: ContactRelatedOrganization | null;
   primaryForOrganization: string | null;
   roleTitle: string | null;
@@ -490,6 +509,13 @@ function buildContactDirectoryItems(data: ContactDataset, today: string): Contac
         roles,
         sourceLabel: person.created_by ? "Added manually" : "Added from research",
         subjectId: person.id,
+        subjectMetadata: {
+          department: null,
+          displayName: null,
+          firstName: person.first_name,
+          lastName: person.last_name,
+          notes: person.notes
+        },
         tasksByRoleId,
         today,
         updatedAt: person.updated_at
@@ -515,6 +541,13 @@ function buildContactDirectoryItems(data: ContactDataset, today: string): Contac
         roles,
         sourceLabel: department.created_by ? "Added manually" : "Added from research",
         subjectId: department.id,
+        subjectMetadata: {
+          department: department.department ?? department.purpose,
+          displayName: department.display_name,
+          firstName: null,
+          lastName: null,
+          notes: department.notes
+        },
         tasksByRoleId,
         today,
         updatedAt: department.updated_at
@@ -538,6 +571,7 @@ function buildDirectoryItem({
   roles,
   sourceLabel,
   subjectId,
+  subjectMetadata,
   tasksByRoleId,
   today,
   updatedAt
@@ -554,6 +588,13 @@ function buildDirectoryItem({
   roles: ContactRoleRow[];
   sourceLabel: "Added from research" | "Added manually";
   subjectId: string;
+  subjectMetadata: {
+    department: string | null;
+    displayName: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    notes: string | null;
+  };
   tasksByRoleId: Map<string, TaskRow[]>;
   today: string;
   updatedAt: string;
@@ -618,12 +659,26 @@ function buildDirectoryItem({
   return {
     ...logicItem,
     backupFor: backupFor.map((id) => organizationsById.get(id)?.name ?? "Unknown organization"),
+    contactCategory: primaryRole?.contact_category ?? null,
     contactHref: logicItem.href,
+    contactRoleId: primaryRole?.id ?? null,
+    department: primaryRole?.department ?? subjectMetadata.department,
+    displayName: subjectMetadata.displayName,
     emailMethodId: emailMethod?.id ?? null,
+    emailMethodIsPrimary: emailMethod?.is_primary ?? false,
+    emailMethodNotes: emailMethod?.notes ?? null,
+    firstName: subjectMetadata.firstName,
+    lastName: subjectMetadata.lastName,
+    notes: subjectMetadata.notes,
+    operationalStatus: primaryRole?.operational_or_influence_status ?? null,
     organizationSummary:
       organization?.name ?? (roles.length > 0 ? "No organization linked" : "No role added"),
     phoneMethodId: phoneMethod?.id ?? null,
+    phoneMethodIsPrimary: phoneMethod?.is_primary ?? false,
+    phoneMethodNotes: phoneMethod?.notes ?? null,
     primaryFor: primaryFor.map((id) => organizationsById.get(id)?.name ?? "Unknown organization"),
+    roleNotes: primaryRole?.notes ?? null,
+    roleTitle: primaryRole?.role_title ?? null,
     subjectId,
     subjectType: kind,
     workspaceHref
@@ -960,6 +1015,7 @@ function toRoleDetail(
     id: role.id,
     notes: role.notes,
     operationalLabel: getOperationalStatusLabel(role.operational_or_influence_status),
+    operationalStatus: role.operational_or_influence_status,
     organization: organization ? toRelatedOrganization(organization) : null,
     primaryForOrganization: primaryOrganizationId ? organizationsById.get(primaryOrganizationId)?.name ?? "Unknown organization" : null,
     roleTitle: role.role_title,
@@ -1019,6 +1075,9 @@ function toRelatedOrganization(organization: OrganizationRow): ContactRelatedOrg
 function getOrganizationWorkspaceHref(organization: Pick<OrganizationRow, "id" | "organization_type">) {
   if (organization.organization_type === "school") return `/school-outreach/schools/${organization.id}`;
   if (organization.organization_type === "school_division") return `/school-outreach/divisions/${organization.id}`;
+  if (isUniversityOutreachOrganizationType(organization.organization_type)) {
+    return getUniversityOutreachHref(organization.id);
+  }
   return `/organizations/${organization.id}`;
 }
 

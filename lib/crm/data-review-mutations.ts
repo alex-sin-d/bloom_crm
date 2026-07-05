@@ -1,9 +1,9 @@
-import { getProtectedSession } from "@/lib/auth/session";
+import { requireAppUser } from "@/lib/auth/authorize";
+import { isAppUserPermissionLevel } from "@/lib/auth/roles";
 import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 type DataReviewItemRow = Database["public"]["Tables"]["data_review_items"]["Row"];
 type DataReviewItemUpdate = Database["public"]["Tables"]["data_review_items"]["Update"];
@@ -112,10 +112,7 @@ const RELATIONSHIP_ALLOWLIST: Record<string, Record<string, string>> = {
 };
 
 async function requireActiveOwner() {
-  const session = await getProtectedSession();
-  if (session.status === "unauthenticated") redirect("/sign-in");
-  if (session.status === "unauthorized") redirect("/unauthorized");
-  return session.profile;
+  return requireAppUser();
 }
 
 function cleanId(value: string | null | undefined) {
@@ -132,6 +129,7 @@ function revalidateDataReviewPaths() {
   revalidatePath("/data-review");
   revalidatePath("/dashboard");
   revalidatePath("/school-outreach");
+  revalidatePath("/university-outreach");
 }
 
 async function auditRecord(
@@ -179,8 +177,8 @@ async function assertActiveOwnerProfile(
     .eq("id", ownerId)
     .maybeSingle();
 
-  if (error || !data || data.status !== "active" || data.permission_level !== "owner") {
-    throw new Error("Review owner must be an active owner.");
+  if (error || !data || data.status !== "active" || !isAppUserPermissionLevel(data.permission_level)) {
+    throw new Error("Review owner must be an active CRM user.");
   }
   return data.id;
 }

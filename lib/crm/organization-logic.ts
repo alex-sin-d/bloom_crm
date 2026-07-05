@@ -1,5 +1,19 @@
 import type { CrmEnums } from "./types.js";
 
+const UNIVERSITY_OUTREACH_TYPES: ReadonlySet<CrmEnums["organization_type"]> = new Set([
+  "university",
+  "college",
+  "polytechnic"
+]);
+
+function isUniversityWorkspaceType(type: CrmEnums["organization_type"]) {
+  return UNIVERSITY_OUTREACH_TYPES.has(type);
+}
+
+function universityOutreachHref(organizationId: string) {
+  return `/university-outreach/institutions/${organizationId}`;
+}
+
 export const ORGANIZATION_CATEGORY_VALUES = [
   "all",
   "schools",
@@ -165,6 +179,10 @@ export function getOrganizationWorkspaceHref(
     return `/school-outreach/divisions/${organization.id}`;
   }
 
+  if (isUniversityWorkspaceType(organization.organizationType)) {
+    return universityOutreachHref(organization.id);
+  }
+
   return `/organizations/${organization.id}`;
 }
 
@@ -173,6 +191,7 @@ export function getSpecializedWorkspaceLabel(
 ) {
   if (type === "school") return "Open school workspace";
   if (type === "school_division") return "Open division workspace";
+  if (isUniversityWorkspaceType(type)) return "Open university workspace";
   return "Open organization";
 }
 

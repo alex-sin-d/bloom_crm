@@ -20,7 +20,10 @@ export type SectionKey =
   | "approval_requirements"
   | "graduation_venue"
   | "opportunity_status"
-  | "approvals";
+  | "approvals"
+  | "university_information"
+  | "university_events"
+  | "university_related_units";
 
 export type CollapseState = Record<string, boolean>;
 
@@ -38,7 +41,10 @@ const DEFAULTS: Record<SectionKey, boolean> = {
   approval_requirements: true,
   graduation_venue: false,
   opportunity_status: false,
-  approvals: true
+  approvals: true,
+  university_information: false,
+  university_events: false,
+  university_related_units: true
 };
 
 /**

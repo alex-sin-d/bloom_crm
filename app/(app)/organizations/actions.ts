@@ -9,10 +9,12 @@ import {
   archiveOrganization,
   createOrganization,
   editOrganization,
+  restoreOrganization,
   type ArchiveOrganizationInput,
   type CreateOrganizationInput,
   type EditOrganizationInput,
-  type OrganizationActionResult
+  type OrganizationActionResult,
+  type RestoreOrganizationInput
 } from "@/lib/crm/organization-mutations";
 import {
   createManualTask,
@@ -29,6 +31,7 @@ export type {
   CreateOrganizationInput,
   EditOrganizationInput,
   OrganizationActionResult,
+  RestoreOrganizationInput,
   TaskActionResult
 };
 
@@ -48,6 +51,12 @@ export async function archiveOrganizationAction(
   input: ArchiveOrganizationInput
 ): Promise<OrganizationActionResult> {
   return archiveOrganization(input);
+}
+
+export async function restoreOrganizationAction(
+  input: RestoreOrganizationInput
+): Promise<OrganizationActionResult> {
+  return restoreOrganization(input);
 }
 
 export async function addOrganizationContactAction(

@@ -1,3 +1,4 @@
+import { APP_USER_PERMISSION_LEVELS } from "@/lib/auth/roles";
 import {
   ACTIVITY_TIMELINE_CATEGORIES,
   buildActivityEvent,
@@ -175,7 +176,7 @@ async function loadFilterOptions(supabase: ServerSupabaseClient): Promise<Activi
       .from("profiles")
       .select("id,email,display_name")
       .eq("status", "active")
-      .eq("permission_level", "owner")
+      .in("permission_level", [...APP_USER_PERMISSION_LEVELS])
       .order("display_name", { ascending: true })
       .limit(50),
     supabase

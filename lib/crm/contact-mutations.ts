@@ -1,4 +1,4 @@
-import { getProtectedSession } from "@/lib/auth/session";
+import { requireAppUser } from "@/lib/auth/authorize";
 import {
   findContactMethodDuplicate,
   findDepartmentDuplicate,
@@ -13,7 +13,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { ContactMethodRow, CrmEnums } from "@/lib/crm/types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 type PersonInsert = Database["public"]["Tables"]["people"]["Insert"];
 type PersonUpdate = Database["public"]["Tables"]["people"]["Update"];
@@ -100,6 +99,10 @@ export type SaveContactMethodInput = {
   contactRoleId: string | null;
   departmentalContactId: string | null;
   isPrimary: boolean;
+  // Set this (instead of contactRoleId/departmentalContactId/personId) to add
+  // a shared inbox owned by the institution itself rather than a specific
+  // person or department, e.g. "office@school.edu" or "info@university.edu".
+  organizationId?: string | null;
   methodType: "email" | "phone";
   note: string | null;
   personId: string | null;
@@ -111,9 +114,22 @@ export type ArchiveContactMethodInput = {
   reason: string | null;
 };
 
+export type RestoreContactMethodInput = {
+  contactMethodId: string;
+};
+
 export type ArchiveContactRoleInput = {
   contactRoleId: string;
   reason: string | null;
+};
+
+export type RestoreContactRoleInput = {
+  contactRoleId: string;
+};
+
+export type UpdateContactStatusInput = {
+  contactRoleId: string;
+  status: Database["public"]["Enums"]["contact_role_status"];
 };
 
 export type AssignContactOutreachInput = {
@@ -123,10 +139,7 @@ export type AssignContactOutreachInput = {
 };
 
 async function requireActiveOwner() {
-  const session = await getProtectedSession();
-  if (session.status === "unauthenticated") redirect("/sign-in");
-  if (session.status === "unauthorized") redirect("/unauthorized");
-  return session.profile;
+  return requireAppUser();
 }
 
 function cleanText(value: string | null | undefined) {
@@ -530,9 +543,12 @@ export async function editPersonContact(input: EditPersonContactInput): Promise<
     const supabase = await createServerSupabaseClient();
     const { data: current, error: currentError } = await supabase.from("people").select("*").eq("id", input.personId).maybeSingle();
     if (currentError || !current) return { error: "Person contact was not found." };
+    const firstName = cleanText(input.firstName);
+    const lastName = cleanText(input.lastName);
+    if (!firstName && !lastName) return { error: "Person name is required." };
     const updatePayload: PersonUpdate = {
-      first_name: cleanText(input.firstName),
-      last_name: cleanText(input.lastName),
+      first_name: firstName,
+      last_name: lastName,
       notes: cleanText(input.note),
       updated_by: profile.id
     };
@@ -549,7 +565,11 @@ export async function editPersonContact(input: EditPersonContactInput): Promise<
       });
       await lockField(supabase, profile.id, "people", input.personId, fieldName, "Manual person contact edit");
     }
-    revalidateContactPaths({ personId: input.personId });
+    revalidateContactPaths({
+      eventIds: await getPersonEventIds(supabase, input.personId),
+      organizationIds: await getPersonOrganizationIds(supabase, input.personId),
+      personId: input.personId
+    });
     return { success: true, personId: input.personId };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not edit person contact." };
@@ -566,9 +586,11 @@ export async function editDepartmentContact(input: EditDepartmentContactInput): 
       .eq("id", input.departmentalContactId)
       .maybeSingle();
     if (currentError || !current) return { error: "Department contact was not found." };
+    const displayName = cleanText(input.displayName);
+    if (!displayName) return { error: "Department name is required." };
     const updatePayload: DepartmentUpdate = {
       department: cleanText(input.function),
-      display_name: cleanText(input.displayName) ?? current.display_name,
+      display_name: displayName,
       notes: cleanText(input.note),
       purpose: cleanText(input.function),
       updated_by: profile.id
@@ -586,7 +608,11 @@ export async function editDepartmentContact(input: EditDepartmentContactInput): 
       });
       await lockField(supabase, profile.id, "departmental_contacts", input.departmentalContactId, fieldName, "Manual department contact edit");
     }
-    revalidateContactPaths({ departmentalContactId: input.departmentalContactId, organizationId: current.organization_id ?? undefined });
+    revalidateContactPaths({
+      departmentalContactId: input.departmentalContactId,
+      eventIds: await getDepartmentEventIds(supabase, input.departmentalContactId),
+      organizationIds: await getDepartmentOrganizationIds(supabase, input.departmentalContactId)
+    });
     return { success: true, departmentalContactId: input.departmentalContactId };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not edit department contact." };
@@ -623,6 +649,7 @@ export async function editContactRole(input: EditContactRoleInput): Promise<Cont
     revalidateContactPaths({
       contactRoleId: input.contactRoleId,
       departmentalContactId: current.departmental_contact_id ?? undefined,
+      eventIds: current.event_id ? [current.event_id] : undefined,
       organizationId: current.organization_id ?? undefined,
       personId: current.person_id ?? undefined
     });
@@ -638,6 +665,8 @@ export async function saveContactMethod(input: SaveContactMethodInput): Promise<
     const supabase = await createServerSupabaseClient();
     const parsed = methodParsedValue(input.methodType, input.value);
     if (!parsed) return { error: "Contact method value is required." };
+    const organizationId = cleanId(input.organizationId ?? null);
+    if (organizationId) await assertOrganization(supabase, organizationId);
     const payload: ContactMethodInsert = {
       contact_role_id: cleanId(input.contactRoleId),
       created_by: profile.id,
@@ -645,10 +674,16 @@ export async function saveContactMethod(input: SaveContactMethodInput): Promise<
       is_primary: input.isPrimary,
       method_type: input.methodType,
       notes: cleanText(input.note),
+      organization_id: organizationId,
       parsed_value: parsed,
       person_id: cleanId(input.personId),
       raw_value: cleanText(input.value),
-      status: input.methodType === "email" ? "verified_personal_email" : "verified_phone"
+      status:
+        input.methodType === "email"
+          ? organizationId
+            ? "general_organization_email"
+            : "verified_personal_email"
+          : "verified_phone"
     };
 
     if (!input.contactMethodId) {
@@ -660,7 +695,7 @@ export async function saveContactMethod(input: SaveContactMethodInput): Promise<
         type: "create"
       });
       await lockContactMethodFields(supabase, profile.id, data.id);
-      revalidateContactPaths(methodRevalidationTargets(data));
+      revalidateContactPaths(await methodRevalidationTargets(supabase, data));
       return { success: true, methodId: data.id };
     }
 
@@ -706,7 +741,7 @@ export async function saveContactMethod(input: SaveContactMethodInput): Promise<
         type: "create"
       });
       await lockContactMethodFields(supabase, profile.id, replacement.id);
-      revalidateContactPaths(methodRevalidationTargets(replacement));
+      revalidateContactPaths(await methodRevalidationTargets(supabase, replacement));
       return { success: true, methodId: replacement.id };
     }
 
@@ -731,7 +766,7 @@ export async function saveContactMethod(input: SaveContactMethodInput): Promise<
       });
       await lockField(supabase, profile.id, "contact_methods", current.id, fieldName, "Manual contact method edit");
     }
-    revalidateContactPaths(methodRevalidationTargets(current));
+    revalidateContactPaths(await methodRevalidationTargets(supabase, current));
     return { success: true, methodId: current.id };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not save contact method." };
@@ -762,7 +797,7 @@ export async function archiveContactMethod(input: ArchiveContactMethodInput): Pr
       reason: updatePayload.archive_reason ?? "Contact method archived",
       type: "archive"
     });
-    revalidateContactPaths(methodRevalidationTargets(current));
+    revalidateContactPaths(await methodRevalidationTargets(supabase, current));
     return { success: true, methodId: current.id };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not archive contact method." };
@@ -799,6 +834,121 @@ export async function archiveContactRole(input: ArchiveContactRoleInput): Promis
     return { success: true, contactRoleId: current.id };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not archive contact role." };
+  }
+}
+
+export async function restoreContactMethod(input: RestoreContactMethodInput): Promise<ContactActionResult> {
+  try {
+    const profile = await requireActiveOwner();
+    const supabase = await createServerSupabaseClient();
+    const { data: current, error: currentError } = await supabase
+      .from("contact_methods")
+      .select("*")
+      .eq("id", input.contactMethodId)
+      .maybeSingle();
+    if (currentError || !current) return { error: "Contact method was not found." };
+    if (!current.archived_at) return { success: true, methodId: current.id };
+
+    const updatePayload: ContactMethodUpdate = {
+      archive_reason: null,
+      archived_at: null,
+      archived_by: null,
+      updated_by: profile.id
+    };
+    const { error } = await supabase.from("contact_methods").update(updatePayload).eq("id", current.id);
+    if (error) return { error: error.message };
+    await auditRecord(supabase, profile.id, "contact_methods", current.id, {
+      after: updatePayload as Json,
+      before: { archived_at: current.archived_at } as Json,
+      reason: "Contact method restored",
+      type: "restore"
+    });
+    revalidateContactPaths(await methodRevalidationTargets(supabase, current));
+    return { success: true, methodId: current.id };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not restore contact method." };
+  }
+}
+
+export async function restoreContactRole(input: RestoreContactRoleInput): Promise<ContactActionResult> {
+  try {
+    const profile = await requireActiveOwner();
+    const supabase = await createServerSupabaseClient();
+    const { data: current, error: currentError } = await supabase
+      .from("contact_roles")
+      .select("*")
+      .eq("id", input.contactRoleId)
+      .maybeSingle();
+    if (currentError || !current) return { error: "Contact role was not found." };
+    if (!current.archived_at) return { success: true, contactRoleId: current.id };
+
+    const updatePayload: ContactRoleUpdate = {
+      archive_reason: null,
+      archived_at: null,
+      archived_by: null,
+      current_status: "unverified",
+      updated_by: profile.id
+    };
+    const { error } = await supabase.from("contact_roles").update(updatePayload).eq("id", current.id);
+    if (error) return { error: error.message };
+    await auditRecord(supabase, profile.id, "contact_roles", current.id, {
+      after: updatePayload as Json,
+      before: { archived_at: current.archived_at, current_status: current.current_status } as Json,
+      reason: "Contact restored",
+      type: "restore"
+    });
+    revalidateContactPaths({
+      contactRoleId: current.id,
+      departmentalContactId: current.departmental_contact_id ?? undefined,
+      organizationId: current.organization_id ?? undefined,
+      personId: current.person_id ?? undefined
+    });
+    return { success: true, contactRoleId: current.id };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not restore contact." };
+  }
+}
+
+/**
+ * Marks a contact as active/current, historical, or unverified without
+ * archiving it - used for "mark this contact outdated / no longer
+ * appropriate" while keeping it visible and keeping every historical
+ * activity and follow-up connected to it. Full archival (which hides the
+ * contact from active lists) remains a separate action.
+ */
+export async function updateContactStatus(input: UpdateContactStatusInput): Promise<ContactActionResult> {
+  try {
+    const profile = await requireActiveOwner();
+    const supabase = await createServerSupabaseClient();
+    const { data: current, error: currentError } = await supabase
+      .from("contact_roles")
+      .select("*")
+      .eq("id", input.contactRoleId)
+      .maybeSingle();
+    if (currentError || !current) return { error: "Contact role was not found." };
+    if (current.current_status === input.status) return { success: true, contactRoleId: current.id };
+
+    const { error } = await supabase
+      .from("contact_roles")
+      .update({ current_status: input.status, updated_by: profile.id })
+      .eq("id", input.contactRoleId);
+    if (error) return { error: error.message };
+    await auditRecord(supabase, profile.id, "contact_roles", input.contactRoleId, {
+      after: { current_status: input.status } as Json,
+      before: { current_status: current.current_status } as Json,
+      fieldName: "current_status",
+      reason: "Contact status updated",
+      type: "update"
+    });
+    revalidateContactPaths({
+      contactRoleId: current.id,
+      departmentalContactId: current.departmental_contact_id ?? undefined,
+      organizationId: current.organization_id ?? undefined,
+      personId: current.person_id ?? undefined
+    });
+    return { success: true, contactRoleId: current.id };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not update contact status." };
   }
 }
 
@@ -871,28 +1021,130 @@ async function upsertOrganizationOutreach(
   return data.id;
 }
 
-function methodRevalidationTargets(method: Pick<ContactMethodRow, "contact_role_id" | "departmental_contact_id" | "person_id">) {
+async function methodRevalidationTargets(
+  supabase: ServerSupabaseClient,
+  method: Pick<
+    ContactMethodRow,
+    "contact_role_id" | "departmental_contact_id" | "organization_id" | "person_id"
+  >
+) {
+  const organizationIds = uniqueValues([
+    ...(method.organization_id ? [method.organization_id] : []),
+    ...(method.person_id ? await getPersonOrganizationIds(supabase, method.person_id) : []),
+    ...(method.departmental_contact_id
+      ? await getDepartmentOrganizationIds(supabase, method.departmental_contact_id)
+      : []),
+    ...(method.contact_role_id ? await getRoleOrganizationIds(supabase, method.contact_role_id) : [])
+  ]);
+  const eventIds = uniqueValues([
+    ...(method.person_id ? await getPersonEventIds(supabase, method.person_id) : []),
+    ...(method.departmental_contact_id
+      ? await getDepartmentEventIds(supabase, method.departmental_contact_id)
+      : []),
+    ...(method.contact_role_id ? await getRoleEventIds(supabase, method.contact_role_id) : [])
+  ]);
   return {
     contactRoleId: method.contact_role_id ?? undefined,
     departmentalContactId: method.departmental_contact_id ?? undefined,
+    eventIds,
+    organizationIds,
     personId: method.person_id ?? undefined
   };
+}
+
+async function getPersonOrganizationIds(supabase: ServerSupabaseClient, personId: string) {
+  const { data, error } = await supabase
+    .from("contact_roles")
+    .select("organization_id")
+    .eq("person_id", personId)
+    .is("archived_at", null);
+  failOnError(error, "Could not load contact organizations.");
+  return uniqueValues((data ?? []).map((role) => role.organization_id));
+}
+
+async function getPersonEventIds(supabase: ServerSupabaseClient, personId: string) {
+  const { data, error } = await supabase
+    .from("contact_roles")
+    .select("event_id")
+    .eq("person_id", personId)
+    .is("archived_at", null);
+  failOnError(error, "Could not load contact events.");
+  return uniqueValues((data ?? []).map((role) => role.event_id));
+}
+
+async function getDepartmentOrganizationIds(supabase: ServerSupabaseClient, departmentalContactId: string) {
+  const [{ data: department, error: departmentError }, { data: roles, error: rolesError }] = await Promise.all([
+    supabase
+      .from("departmental_contacts")
+      .select("organization_id")
+      .eq("id", departmentalContactId)
+      .maybeSingle(),
+    supabase
+      .from("contact_roles")
+      .select("organization_id")
+      .eq("departmental_contact_id", departmentalContactId)
+      .is("archived_at", null)
+  ]);
+  failOnError(departmentError, "Could not load department contact organization.");
+  failOnError(rolesError, "Could not load department contact roles.");
+  return uniqueValues([
+    department?.organization_id,
+    ...(roles ?? []).map((role) => role.organization_id)
+  ]);
+}
+
+async function getDepartmentEventIds(supabase: ServerSupabaseClient, departmentalContactId: string) {
+  const { data, error } = await supabase
+    .from("contact_roles")
+    .select("event_id")
+    .eq("departmental_contact_id", departmentalContactId)
+    .is("archived_at", null);
+  failOnError(error, "Could not load department contact events.");
+  return uniqueValues((data ?? []).map((role) => role.event_id));
+}
+
+async function getRoleOrganizationIds(supabase: ServerSupabaseClient, contactRoleId: string) {
+  const { data, error } = await supabase
+    .from("contact_roles")
+    .select("organization_id")
+    .eq("id", contactRoleId)
+    .maybeSingle();
+  failOnError(error, "Could not load contact role organization.");
+  return uniqueValues([data?.organization_id]);
+}
+
+async function getRoleEventIds(supabase: ServerSupabaseClient, contactRoleId: string) {
+  const { data, error } = await supabase
+    .from("contact_roles")
+    .select("event_id")
+    .eq("id", contactRoleId)
+    .maybeSingle();
+  failOnError(error, "Could not load contact role event.");
+  return uniqueValues([data?.event_id]);
 }
 
 function revalidateContactPaths({
   contactRoleId,
   departmentalContactId,
+  eventIds,
   organizationId,
+  organizationIds,
   personId
 }: {
   contactRoleId?: string;
   departmentalContactId?: string;
+  eventIds?: string[];
   organizationId?: string;
+  organizationIds?: string[];
   personId?: string;
 }) {
   revalidatePath("/contacts");
   revalidatePath("/activity");
   revalidatePath("/dashboard");
+  revalidatePath("/events");
+  revalidatePath("/organizations");
+  revalidatePath("/school-outreach");
+  revalidatePath("/university-outreach");
   if (personId) {
     revalidatePath(`/contacts/people/${personId}`);
     revalidatePath(`/activity?person=${personId}`);
@@ -902,10 +1154,14 @@ function revalidateContactPaths({
     revalidatePath(`/activity?department=${departmentalContactId}`);
   }
   if (contactRoleId) revalidatePath(`/activity?contactRole=${contactRoleId}`);
-  if (organizationId) {
-    revalidatePath(`/organizations/${organizationId}`);
-    revalidatePath(`/school-outreach/divisions/${organizationId}`);
-    revalidatePath(`/school-outreach/schools/${organizationId}`);
-    revalidatePath(`/activity?organization=${organizationId}`);
+  for (const id of uniqueValues([organizationId, ...(organizationIds ?? [])])) {
+    revalidatePath(`/organizations/${id}`);
+    revalidatePath(`/school-outreach/divisions/${id}`);
+    revalidatePath(`/school-outreach/schools/${id}`);
+    revalidatePath(`/university-outreach/institutions/${id}`);
+    revalidatePath(`/activity?organization=${id}`);
+  }
+  for (const eventId of uniqueValues(eventIds ?? [])) {
+    revalidatePath(`/events/${eventId}`);
   }
 }

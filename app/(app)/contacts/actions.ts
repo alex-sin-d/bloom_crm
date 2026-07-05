@@ -10,7 +10,10 @@ import {
   editContactRole,
   editDepartmentContact,
   editPersonContact,
+  restoreContactMethod,
+  restoreContactRole,
   saveContactMethod,
+  updateContactStatus,
   type AddContactRoleInput,
   type ArchiveContactMethodInput,
   type ArchiveContactRoleInput,
@@ -21,7 +24,10 @@ import {
   type EditContactRoleInput,
   type EditDepartmentContactInput,
   type EditPersonContactInput,
-  type SaveContactMethodInput
+  type RestoreContactMethodInput,
+  type RestoreContactRoleInput,
+  type SaveContactMethodInput,
+  type UpdateContactStatusInput
 } from "@/lib/crm/contact-mutations";
 
 export type {
@@ -35,7 +41,10 @@ export type {
   EditContactRoleInput,
   EditDepartmentContactInput,
   EditPersonContactInput,
-  SaveContactMethodInput
+  RestoreContactMethodInput,
+  RestoreContactRoleInput,
+  SaveContactMethodInput,
+  UpdateContactStatusInput
 };
 
 export async function createPersonContactAction(input: CreatePersonContactInput): Promise<ContactActionResult> {
@@ -72,6 +81,18 @@ export async function archiveContactMethodAction(input: ArchiveContactMethodInpu
 
 export async function archiveContactRoleAction(input: ArchiveContactRoleInput): Promise<ContactActionResult> {
   return archiveContactRole(input);
+}
+
+export async function restoreContactRoleAction(input: RestoreContactRoleInput): Promise<ContactActionResult> {
+  return restoreContactRole(input);
+}
+
+export async function restoreContactMethodAction(input: RestoreContactMethodInput): Promise<ContactActionResult> {
+  return restoreContactMethod(input);
+}
+
+export async function updateContactStatusAction(input: UpdateContactStatusInput): Promise<ContactActionResult> {
+  return updateContactStatus(input);
 }
 
 export async function assignContactOutreachAction(input: AssignContactOutreachInput): Promise<ContactActionResult> {

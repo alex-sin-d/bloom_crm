@@ -1,7 +1,12 @@
+import { APP_USER_PERMISSION_LEVELS } from "@/lib/auth/roles";
 import { formatPipelineStageLabel } from "@/lib/crm/format";
 import { getOpportunityWorkspaceHref } from "@/lib/crm/outreach-labels";
 import { failOnError, selectInChunks, stringParam, uniqueValues } from "@/lib/crm/query-utils";
 import type { ServerSupabaseClient } from "@/lib/crm/shared-queries";
+import {
+  getUniversityOutreachHref,
+  isUniversityOutreachOrganizationType
+} from "@/lib/crm/university-outreach-logic";
 import {
   deriveTaskTypeKey,
   filterTasksForView,
@@ -227,7 +232,7 @@ async function getOwnerOptions(supabase: ServerSupabaseClient) {
     .from("profiles")
     .select("id,email,display_name")
     .eq("status", "active")
-    .eq("permission_level", "owner")
+    .in("permission_level", [...APP_USER_PERMISSION_LEVELS])
     .order("display_name", { ascending: true, nullsFirst: false });
 
   failOnError(error, "Could not load assignable owners.");
@@ -479,6 +484,9 @@ function getOrganizationWorkspaceHref(organization: TaskOrganizationOption | nul
   if (organization.organizationType === "school_division") {
     return `/school-outreach/divisions/${organization.id}`;
   }
+  if (isUniversityOutreachOrganizationType(organization.organizationType)) {
+    return getUniversityOutreachHref(organization.id);
+  }
   return `/organizations/${organization.id}`;
 }
 
@@ -500,6 +508,7 @@ function getWorkspaceLabel(href: string | null) {
   if (!href) return null;
   if (href.includes("/school-outreach/schools/")) return "Open school workspace";
   if (href.includes("/school-outreach/divisions/")) return "Open division workspace";
+  if (href.includes("/university-outreach/institutions/")) return "Open university workspace";
   if (href.includes("/opportunities/")) return "Open opportunity";
   return "Open organization";
 }

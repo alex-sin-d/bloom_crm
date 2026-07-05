@@ -1,3 +1,4 @@
+import { APP_USER_PERMISSION_LEVELS } from "@/lib/auth/roles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { failOnError } from "@/lib/crm/query-utils";
@@ -13,7 +14,7 @@ export async function getActiveOwnerProfiles(): Promise<ProfileSummary[]> {
     .from("profiles")
     .select("id,email,display_name")
     .eq("status", "active")
-    .eq("permission_level", "owner")
+    .in("permission_level", [...APP_USER_PERMISSION_LEVELS])
     .order("display_name", { ascending: true, nullsFirst: false });
 
   failOnError(error, "Could not load assignable owners.");

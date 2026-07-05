@@ -1,5 +1,10 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
+import {
+  isAppUserPermissionLevel,
+  permissionLevelToRole,
+  type AppRole
+} from "@/lib/auth/roles";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
@@ -7,7 +12,8 @@ export type ActiveOwnerProfile = {
   displayName: string;
   email: string;
   id: string;
-  permissionLevel: "owner";
+  permissionLevel: string;
+  role: AppRole;
   status: "active";
 };
 
@@ -51,7 +57,7 @@ export async function getProtectedSession(): Promise<ProtectedSession> {
     profileError ||
     !profile ||
     profile.status !== "active" ||
-    profile.permission_level !== "owner"
+    !isAppUserPermissionLevel(profile.permission_level)
   ) {
     return { status: "unauthorized", user };
   }
@@ -62,6 +68,7 @@ export async function getProtectedSession(): Promise<ProtectedSession> {
       email: profile.email,
       id: profile.id,
       permissionLevel: profile.permission_level,
+      role: permissionLevelToRole(profile.permission_level),
       status: profile.status
     },
     status: "authorized",

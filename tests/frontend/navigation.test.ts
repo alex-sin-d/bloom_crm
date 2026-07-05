@@ -3,12 +3,13 @@ import { describe, it } from "node:test";
 import { adminToolsLink, primaryNavigation } from "../../lib/config/navigation.js";
 
 describe("primary navigation", () => {
-  it("contains exactly the five everyday outreach screens", () => {
+  it("contains exactly the six everyday outreach screens", () => {
     assert.deepEqual(
       primaryNavigation.map((item) => [item.label, item.href]),
       [
         ["Dashboard", "/dashboard"],
         ["School Outreach", "/school-outreach"],
+        ["University Outreach", "/university-outreach"],
         ["Opportunities to Review", "/research/opportunities"],
         ["Active Opportunities", "/pipeline"],
         ["Tasks", "/tasks"]

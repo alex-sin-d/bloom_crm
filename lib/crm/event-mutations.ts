@@ -1,4 +1,5 @@
-import { getProtectedSession } from "@/lib/auth/session";
+import { requireAppUser } from "@/lib/auth/authorize";
+import { isAppUserPermissionLevel } from "@/lib/auth/roles";
 import { normalizeContactPhone } from "@/lib/crm/contact-logic";
 import { selectInChunks } from "@/lib/crm/query-utils";
 import { getRecordTypeId, type ServerSupabaseClient } from "@/lib/crm/shared-queries";
@@ -7,7 +8,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CrmEnums, EventRow, OpportunityRow } from "@/lib/crm/types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 type EventInsert = Database["public"]["Tables"]["events"]["Insert"];
 type EventUpdate = Database["public"]["Tables"]["events"]["Update"];
@@ -151,10 +151,7 @@ export type CreateVenueInput = {
 };
 
 async function requireActiveOwner() {
-  const session = await getProtectedSession();
-  if (session.status === "unauthenticated") redirect("/sign-in");
-  if (session.status === "unauthorized") redirect("/unauthorized");
-  return session.profile;
+  return requireAppUser();
 }
 
 function cleanText(value: string | null | undefined) {
@@ -322,8 +319,10 @@ function revalidateEventPaths(event: Pick<EventRow, "id" | "organization_id">, o
   revalidatePath(`/activity?event=${event.id}`);
   revalidatePath(`/organizations/${event.organization_id}`);
   revalidatePath("/school-outreach");
+  revalidatePath("/university-outreach");
   revalidatePath(`/school-outreach/divisions/${event.organization_id}`);
   revalidatePath(`/school-outreach/schools/${event.organization_id}`);
+  revalidatePath(`/university-outreach/institutions/${event.organization_id}`);
   if (opportunityId) revalidatePath(`/opportunities/${opportunityId}`);
 }
 
@@ -859,8 +858,8 @@ async function assertActiveOwnerProfile(supabase: ServerSupabaseClient, profileI
     .select("id,status,permission_level")
     .eq("id", profileId)
     .maybeSingle();
-  if (error || !data || data.status !== "active" || data.permission_level !== "owner") {
-    throw new Error("Event staff must be an active owner.");
+  if (error || !data || data.status !== "active" || !isAppUserPermissionLevel(data.permission_level)) {
+    throw new Error("Event staff must be an active CRM user.");
   }
 }
 

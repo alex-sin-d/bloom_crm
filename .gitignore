@@ -39,3 +39,6 @@ supabase/.branches/
 *.tsbuildinfo
 .env
 .env.*
+
+.admin-dist/
+.data-transfer-dist/
