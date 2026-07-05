@@ -15,12 +15,20 @@
     "importer:test": "tsc -p tsconfig.importer.json && node --test .importer-dist/scripts/importer/__tests__/*.test.js",
     "importer:validate": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/cli.js validate",
     "importer:dry-run": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/cli.js dry-run",
-    "importer:local": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/cli.js import"
+    "importer:local": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/cli.js import",
+    "admin:build": "tsc -p tsconfig.admin.json",
+    "admin:test": "tsc -p tsconfig.admin.json && node --test .admin-dist/scripts/admin/__tests__/*.test.js",
+    "admin:create-user": "tsc -p tsconfig.admin.json && node .admin-dist/scripts/admin/create-app-user.js",
+    "admin:seed-local-fixtures": "tsc -p tsconfig.admin.json && node .admin-dist/scripts/admin/seed-local-role-fixtures.js",
+    "data-transfer:build": "tsc -p tsconfig.data-transfer.json",
+    "data-transfer:test": "tsc -p tsconfig.data-transfer.json && node --test .data-transfer-dist/scripts/data-transfer/__tests__/*.test.js",
+    "data-transfer:dry-run": "tsc -p tsconfig.data-transfer.json && node .data-transfer-dist/scripts/data-transfer/transfer.js --dry-run",
+    "data-transfer:run": "tsc -p tsconfig.data-transfer.json && node .data-transfer-dist/scripts/data-transfer/transfer.js"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.108.2",
+    "@supabase/supabase-js": "^2.110.0",
     "next": "^16.2.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
@@ -28,10 +36,12 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.1",
     "@types/node": "^26.0.1",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.9",
+    "pg": "^8.22.0",
     "postcss": "^8.5.15",
     "supabase": "^2.108.0",
     "tailwindcss": "^4.3.1",
