@@ -805,7 +805,6 @@ export function UniversityDetailWorkspace({
         summary={`${detail.contacts.length} known contacts - ${outreachStatusLabel} - ${outreachRouteLabel}`}
       >
         <DivisionContactsAndOutreach
-          activatableOpportunityId={null}
           contactGroups={detail.contactGroups}
           contactRoleOptions={contactRoleOptions}
           isActive
@@ -814,7 +813,6 @@ export function UniversityDetailWorkspace({
           preferences={detail.collapsePreferences}
           routeOptions={UNIVERSITY_ROUTE_OPTIONS}
           sourcePlaceholder="e.g. university website, LinkedIn"
-          workspacePath={`/university-outreach/institutions/${detail.organization.id}`}
         />
       </CollapsibleSection>
 

@@ -148,7 +148,10 @@ function ContactEditModal({ contact, onClose }: { contact: EditableContact; onCl
 
     const result = await saveContactMethodAction({
       contactMethodId: existing?.id ?? undefined,
-      contactRoleId: contact.contactRoleId,
+      // Own the method by the subject (person or department) only. Setting
+      // contactRoleId here alongside personId/departmentalContactId would put two
+      // owners on the row and violate contact_methods_exactly_one_owner.
+      contactRoleId: null,
       departmentalContactId: contact.subjectType === "department" ? contact.subjectId : null,
       isPrimary: existing?.isPrimary ?? true,
       methodType,

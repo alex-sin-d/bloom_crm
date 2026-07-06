@@ -58,7 +58,6 @@ export default async function SchoolPage({ params, searchParams }: SchoolPagePro
     detail.outreachSummary.outreachRow?.outreach_route ?? null
   );
 
-  const workspacePath = `/school-outreach/schools/${schoolId}`;
   const showActivatedBanner = (rawSearchParams as Record<string, string | undefined>).activated === "1";
 
   return (
@@ -130,7 +129,6 @@ export default async function SchoolPage({ params, searchParams }: SchoolPagePro
         summary={`${detail.contacts.length} known contacts · ${outreachStatusLabel} · ${outreachRouteLabel}`}
       >
         <SchoolContactsAndOutreach
-          activatableOpportunityId={detail.activatableOpportunityId}
           contactGroupings={detail.contactGroupings}
           contactRoleOptions={contactRoleOptions}
           isActive={detail.isActive}
@@ -138,7 +136,6 @@ export default async function SchoolPage({ params, searchParams }: SchoolPagePro
           organizationId={detail.school.id}
           outreachSummary={detail.outreachSummary}
           preferences={detail.collapsePreferences}
-          workspacePath={workspacePath}
         />
       </CollapsibleSection>
 

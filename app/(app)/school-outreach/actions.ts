@@ -1,6 +1,13 @@
 "use server";
 
 import { requireAppUser } from "@/lib/auth/authorize";
+import {
+  ACTIVE_PIPELINE_RESEARCH_STATUS,
+  INITIAL_ACTIVE_PIPELINE_STAGE,
+  buildAddToPipelineAuditValues,
+  buildAddToPipelineUpdate,
+  getActivationBlocker
+} from "@/lib/crm/add-to-pipeline";
 import { deriveOutreachRuleResult } from "@/lib/crm/outreach-rules";
 import { mergeCollapseState } from "@/lib/crm/collapse-preferences";
 import {
@@ -54,6 +61,113 @@ async function upsertOrganizationOutreach(
   return existing.id;
 }
 
+// Ensure the organization has an active (added-to-pipeline) opportunity so it
+// shows up in Active Opportunities. Called when the first outreach is logged (or
+// a contacted status is set) so users no longer have to activate manually.
+// Idempotent: reuses an already-active opportunity, otherwise activates an
+// existing research_only one, otherwise creates a new active opportunity.
+async function ensureActiveOpportunity(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  organizationId: string,
+  profileId: string
+): Promise<string | null> {
+  const { data: opportunities } = await supabase
+    .from("opportunities")
+    .select(
+      "id,opportunity_name,active_cycle_year,research_status,pipeline_stage,assigned_owner_id,added_to_pipeline_at,added_to_pipeline_by"
+    )
+    .eq("primary_organization_id", organizationId)
+    .is("archived_at", null)
+    .order("created_at", { ascending: true });
+
+  const rows = opportunities ?? [];
+
+  // Already active → reuse (idempotent).
+  const active = rows.find((row) => row.research_status === ACTIVE_PIPELINE_RESEARCH_STATUS);
+  if (active) return active.id;
+
+  const activatedAt = new Date().toISOString();
+  const opportunityRecordTypeId = await getRecordTypeId(supabase, "opportunities");
+
+  // Activate an existing research_only opportunity.
+  const activatable = rows.find((row) => getActivationBlocker(row) === null);
+  if (activatable) {
+    const { data: updated } = await supabase
+      .from("opportunities")
+      .update(buildAddToPipelineUpdate(profileId, activatedAt, activatable.assigned_owner_id ?? null))
+      .eq("id", activatable.id)
+      .eq("pipeline_stage", "research_only")
+      .neq("research_status", ACTIVE_PIPELINE_RESEARCH_STATUS)
+      .select("id")
+      .maybeSingle();
+    if (updated) {
+      const auditValues = buildAddToPipelineAuditValues(activatable, profileId, activatable.assigned_owner_id ?? null);
+      await supabase.from("audit_log").insert({
+        ...auditValues,
+        after_value: {
+          ...(auditValues.after_value as Record<string, unknown>),
+          added_to_pipeline_at: activatedAt,
+          added_to_pipeline_by: profileId
+        },
+        record_id: activatable.id,
+        record_type_id: opportunityRecordTypeId
+      });
+      return updated.id;
+    }
+    // Fell through (race): re-read and reuse whatever is now active.
+    const { data: reread } = await supabase
+      .from("opportunities")
+      .select("id")
+      .eq("primary_organization_id", organizationId)
+      .eq("research_status", ACTIVE_PIPELINE_RESEARCH_STATUS)
+      .is("archived_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (reread) return reread.id;
+  }
+
+  // No opportunity at all → create one directly in the active state.
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .maybeSingle();
+  const opportunityName = organization?.name?.trim() || "Outreach opportunity";
+
+  const { data: created, error: createError } = await supabase
+    .from("opportunities")
+    .insert({
+      opportunity_name: opportunityName,
+      primary_organization_id: organizationId,
+      research_status: ACTIVE_PIPELINE_RESEARCH_STATUS,
+      pipeline_stage: INITIAL_ACTIVE_PIPELINE_STAGE,
+      added_to_pipeline_at: activatedAt,
+      added_to_pipeline_by: profileId,
+      created_by: profileId,
+      updated_by: profileId
+    })
+    .select("id")
+    .single();
+  if (createError || !created) return null;
+
+  await supabase.from("audit_log").insert({
+    action_type: "create",
+    after_value: {
+      research_status: ACTIVE_PIPELINE_RESEARCH_STATUS,
+      pipeline_stage: INITIAL_ACTIVE_PIPELINE_STAGE,
+      added_to_pipeline_at: activatedAt,
+      added_to_pipeline_by: profileId
+    },
+    field_name: "pipeline_stage",
+    reason: "Auto-activated on first outreach",
+    record_id: created.id,
+    record_type_id: opportunityRecordTypeId,
+    user_id: profileId
+  });
+
+  return created.id;
+}
+
 function revalidateOutreachPaths(organizationId: string) {
   revalidatePath(`/school-outreach/divisions/${organizationId}`);
   revalidatePath(`/school-outreach/schools/${organizationId}`);
@@ -63,6 +177,9 @@ function revalidateOutreachPaths(organizationId: string) {
   revalidatePath(`/organizations/${organizationId}`);
   revalidatePath("/organizations");
   revalidatePath("/dashboard");
+  // First outreach can auto-activate the org into the pipeline; refresh those lists too.
+  revalidatePath("/pipeline");
+  revalidatePath("/research/opportunities");
 }
 
 // ── Choose primary / backup contact ──────────────────────────────────────────
@@ -252,6 +369,11 @@ export async function changeOutreachStatusAction(
     record_type_id: outreachRecordTypeId,
     user_id: profile.id
   });
+
+  // Setting any contacted status moves the org into Active Opportunities.
+  if (status !== "not_contacted") {
+    await ensureActiveOpportunity(supabase, organizationId, profile.id);
+  }
 
   revalidateOutreachPaths(organizationId);
   return { success: true };
@@ -551,6 +673,11 @@ export async function logContactAction(input: LogContactInput): Promise<LogConta
     new Date(input.activityAt)
   );
 
+  // First outreach auto-activates the org into Active Opportunities. Idempotent:
+  // reuses the existing opportunity if one is already active.
+  const opportunityId =
+    (await ensureActiveOpportunity(supabase, input.organizationId, profile.id)) ?? input.opportunityId;
+
   const { data: activity, error: activityError } = await supabase
     .from("activities")
     .insert({
@@ -559,7 +686,7 @@ export async function logContactAction(input: LogContactInput): Promise<LogConta
       direction: ruleResult.activity.direction,
       activity_at: input.activityAt,
       organization_id: input.organizationId,
-      opportunity_id: input.opportunityId,
+      opportunity_id: opportunityId,
       contact_role_id: input.contactRoleId,
       outcome: ruleResult.activity.outcome,
       summary: input.notes,
@@ -597,7 +724,7 @@ export async function logContactAction(input: LogContactInput): Promise<LogConta
       assigned_user_id: profile.id,
       created_by: profile.id,
       organization_id: input.organizationId,
-      opportunity_id: input.opportunityId,
+      opportunity_id: opportunityId,
       contact_role_id: input.contactRoleId,
       due_date: ruleResult.reminder.dueDateString,
       related_activity_id: activity.id

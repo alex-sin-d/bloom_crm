@@ -68,7 +68,6 @@ export default async function SchoolDivisionPage({
     detail.outreachSummary.outreachRow?.outreach_route ?? null
   );
 
-  const workspacePath = `/school-outreach/divisions/${divisionId}`;
   const showActivatedBanner = (rawSearchParams as Record<string, string | undefined>).activated === "1";
 
   return (
@@ -111,7 +110,6 @@ export default async function SchoolDivisionPage({
         summary={`${detail.contacts.length} known contacts · ${outreachStatusLabel} · ${outreachRouteLabel}`}
       >
         <DivisionContactsAndOutreach
-          activatableOpportunityId={detail.activatableOpportunityId}
           contactGroups={detail.contactGroups}
           contactRoleOptions={contactRoleOptions}
           isActive={detail.isActive}
@@ -119,7 +117,6 @@ export default async function SchoolDivisionPage({
           organizationId={detail.division.id}
           outreachSummary={detail.outreachSummary}
           preferences={detail.collapsePreferences}
-          workspacePath={workspacePath}
         />
       </CollapsibleSection>
 

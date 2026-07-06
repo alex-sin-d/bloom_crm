@@ -151,6 +151,36 @@ function cleanId(value: string | null | undefined) {
   return cleanText(value);
 }
 
+// A contact_methods row must be owned by exactly one of organization / person /
+// department / contact role (contact_methods_exactly_one_owner). Callers may pass
+// several owner ids; keep the first non-null by precedence and null the rest so
+// we never send a row with zero or multiple owners to the database.
+function resolveSingleOwner(owner: {
+  organizationId: string | null;
+  personId: string | null;
+  departmentalContactId: string | null;
+  contactRoleId: string | null;
+}) {
+  const winner =
+    owner.organizationId ?? owner.personId ?? owner.departmentalContactId ?? owner.contactRoleId ?? null;
+  if (!winner) return null;
+  return {
+    organization_id: owner.organizationId === winner ? winner : null,
+    person_id: owner.organizationId !== winner && owner.personId === winner ? winner : null,
+    departmental_contact_id:
+      owner.organizationId !== winner && owner.personId !== winner && owner.departmentalContactId === winner
+        ? winner
+        : null,
+    contact_role_id:
+      owner.organizationId !== winner &&
+      owner.personId !== winner &&
+      owner.departmentalContactId !== winner &&
+      owner.contactRoleId === winner
+        ? winner
+        : null
+  };
+}
+
 function normalizeEmail(value: string | null | undefined) {
   return cleanText(value)?.toLowerCase() ?? null;
 }
@@ -667,16 +697,23 @@ export async function saveContactMethod(input: SaveContactMethodInput): Promise<
     if (!parsed) return { error: "Contact method value is required." };
     const organizationId = cleanId(input.organizationId ?? null);
     if (organizationId) await assertOrganization(supabase, organizationId);
+    const owner = resolveSingleOwner({
+      organizationId,
+      personId: cleanId(input.personId),
+      departmentalContactId: cleanId(input.departmentalContactId),
+      contactRoleId: cleanId(input.contactRoleId)
+    });
+    if (!owner) return { error: "Contact method needs an owner (person, department, role, or organization)." };
     const payload: ContactMethodInsert = {
-      contact_role_id: cleanId(input.contactRoleId),
+      contact_role_id: owner.contact_role_id,
       created_by: profile.id,
-      departmental_contact_id: cleanId(input.departmentalContactId),
+      departmental_contact_id: owner.departmental_contact_id,
       is_primary: input.isPrimary,
       method_type: input.methodType,
       notes: cleanText(input.note),
-      organization_id: organizationId,
+      organization_id: owner.organization_id,
       parsed_value: parsed,
-      person_id: cleanId(input.personId),
+      person_id: owner.person_id,
       raw_value: cleanText(input.value),
       status:
         input.methodType === "email"

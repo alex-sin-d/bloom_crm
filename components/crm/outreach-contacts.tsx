@@ -13,7 +13,6 @@ import {
   saveCollapseStateAction
 } from "@/app/(app)/school-outreach/actions";
 import type { AddContactInput, DuplicateWarningResult } from "@/app/(app)/school-outreach/actions";
-import { addToPipelineAction } from "@/app/(app)/research/opportunities/actions";
 import {
   cityGroupCollapseKey,
   collapseKey,
@@ -179,7 +178,7 @@ export function OutreachStatusBadge({
 
 // ── Follow-up task with completion control ────────────────────────────────────
 
-function FollowUpTask({ isActive, task }: { isActive: boolean; task: TaskRow }) {
+function FollowUpTask({ task }: { task: TaskRow }) {
   const [pending, startTransition] = useTransition();
   const [completed, setCompleted] = useState(false);
 
@@ -193,22 +192,20 @@ function FollowUpTask({ isActive, task }: { isActive: boolean; task: TaskRow }) 
 
   return (
     <div className="flex items-center gap-2">
-      {isActive ? (
-        <button
-          aria-label="Mark follow-up complete"
-          disabled={pending || completed}
-          onClick={complete}
-          type="button"
-          className={[
-            "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-            completed
-              ? "border-brand-forest bg-brand-forest text-white"
-              : "border-border bg-white hover:border-brand-forest"
-          ].join(" ")}
-        >
-          {completed ? <CheckIcon /> : null}
-        </button>
-      ) : null}
+      <button
+        aria-label="Mark follow-up complete"
+        disabled={pending || completed}
+        onClick={complete}
+        type="button"
+        className={[
+          "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+          completed
+            ? "border-brand-forest bg-brand-forest text-white"
+            : "border-border bg-white hover:border-brand-forest"
+        ].join(" ")}
+      >
+        {completed ? <CheckIcon /> : null}
+      </button>
       <span className={["text-sm", completed ? "text-text-muted line-through" : "text-text-body"].join(" ")}>
         {task.due_date ? formatDate(task.due_date) : "No date"} — {task.title}
         {pending ? " …" : ""}
@@ -219,59 +216,18 @@ function FollowUpTask({ isActive, task }: { isActive: boolean; task: TaskRow }) 
 
 // ── Contacts and outreach summary ─────────────────────────────────────────────
 
-function ActivationControl({
-  activatableOpportunityId,
-  workspacePath
-}: {
-  activatableOpportunityId: string | null;
-  workspacePath: string;
-}) {
-  const [pending, startTransition] = useTransition();
-
-  if (!activatableOpportunityId) {
-    return (
-      <p className="text-xs text-text-muted">
-        No activatable opportunity. Add this organization to Active Opportunities from the research screen.
-      </p>
-    );
-  }
-
-  return (
-    <form
-      action={(formData) => {
-        startTransition(() => addToPipelineAction(formData));
-      }}
-    >
-      <input name="opportunityId" type="hidden" value={activatableOpportunityId} />
-      <input name="confirmActivation" type="hidden" value="confirmed" />
-      <input name="returnTo" type="hidden" value={workspacePath} />
-      <button
-        className="rounded-control bg-brand-forest px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
-        disabled={pending}
-        type="submit"
-      >
-        {pending ? "Adding…" : "Add to Active Opportunities"}
-      </button>
-    </form>
-  );
-}
-
 function ContactsAndOutreachSummaryGrid({
-  activatableOpportunityId,
   isActive,
   organizationId,
   outreachSummary,
   contactRoleOptions,
-  routeOptions,
-  workspacePath
+  routeOptions
 }: {
-  activatableOpportunityId: string | null;
   isActive: boolean;
   organizationId: string;
   outreachSummary: OutreachSummary;
   contactRoleOptions: Array<{ id: string; label: string }>;
   routeOptions?: OutreachRouteOption[];
-  workspacePath: string;
 }) {
   const { outreachRow, primaryContact, backupContact, lastContactAt, nextFollowUp } =
     outreachSummary;
@@ -279,16 +235,9 @@ function ContactsAndOutreachSummaryGrid({
   return (
     <div className="space-y-4">
       {!isActive ? (
-        <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-          <p className="font-medium text-amber-800">Research workspace — outreach controls not yet available</p>
-          <p className="mt-0.5 text-amber-700">Contact management (view, add, choose primary) is always available. Route, status, and logging unlock after adding to Active Opportunities.</p>
-          <div className="mt-2">
-            <ActivationControl
-              activatableOpportunityId={activatableOpportunityId}
-              workspacePath={workspacePath}
-            />
-          </div>
-        </div>
+        <p className="text-sm text-text-muted">
+          Research workspace. This organization will move into Active Opportunities when first outreach is logged.
+        </p>
       ) : null}
 
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -302,26 +251,18 @@ function ContactsAndOutreachSummaryGrid({
         </SummaryItem>
 
         <SummaryItem label="Outreach route">
-          {isActive ? (
-            <OutreachRoutePicker
-              organizationId={organizationId}
-              current={outreachRow?.outreach_route ?? "not_decided"}
-              options={routeOptions}
-            />
-          ) : (
-            <span className="text-sm text-text-muted">Not decided</span>
-          )}
+          <OutreachRoutePicker
+            organizationId={organizationId}
+            current={outreachRow?.outreach_route ?? "not_decided"}
+            options={routeOptions}
+          />
         </SummaryItem>
 
         <SummaryItem label="Outreach status">
-          {isActive ? (
-            <OutreachStatusDropdown
-              organizationId={organizationId}
-              current={outreachRow?.outreach_status ?? "not_contacted"}
-            />
-          ) : (
-            <span className="text-sm text-text-muted">Not contacted</span>
-          )}
+          <OutreachStatusDropdown
+            organizationId={organizationId}
+            current={outreachRow?.outreach_status ?? "not_contacted"}
+          />
         </SummaryItem>
 
         <SummaryItem label="Last contact">
@@ -332,7 +273,7 @@ function ContactsAndOutreachSummaryGrid({
 
         <SummaryItem label="Next follow-up">
           {nextFollowUp ? (
-            <FollowUpTask isActive={isActive} task={nextFollowUp} />
+            <FollowUpTask task={nextFollowUp} />
           ) : (
             <span className="text-sm text-text-muted">None scheduled</span>
           )}
@@ -1386,7 +1327,6 @@ export function SchoolContactSection({
 // ── Division contacts and outreach panel ───────────────────────────────────────
 
 export function DivisionContactsAndOutreach({
-  activatableOpportunityId,
   contactGroups,
   contactRoleOptions,
   isActive,
@@ -1395,10 +1335,8 @@ export function DivisionContactsAndOutreach({
   outreachSummary,
   preferences,
   routeOptions,
-  sourcePlaceholder,
-  workspacePath
+  sourcePlaceholder
 }: {
-  activatableOpportunityId: string | null;
   contactGroups: ContactGroup[];
   contactRoleOptions: Array<{ id: string; label: string }>;
   isActive: boolean;
@@ -1408,7 +1346,6 @@ export function DivisionContactsAndOutreach({
   preferences: Json | null | undefined;
   routeOptions?: OutreachRouteOption[];
   sourcePlaceholder?: string;
-  workspacePath: string;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
@@ -1431,13 +1368,11 @@ export function DivisionContactsAndOutreach({
     <>
       <div className="space-y-5">
         <ContactsAndOutreachSummaryGrid
-          activatableOpportunityId={activatableOpportunityId}
           isActive={isActive}
           organizationId={organizationId}
           outreachSummary={outreachSummary}
           contactRoleOptions={contactRoleOptions}
           routeOptions={routeOptions}
-          workspacePath={workspacePath}
         />
 
         <div className="flex flex-wrap gap-2">
@@ -1448,20 +1383,18 @@ export function DivisionContactsAndOutreach({
           >
             + Add contact
           </button>
-          {isActive ? (
-            <button
-              className="rounded-control border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-body hover:bg-gray-50"
-              onClick={() => openLogForm(null)}
-              type="button"
-            >
-              Log contact
-            </button>
-          ) : null}
+          <button
+            className="rounded-control border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-body hover:bg-gray-50"
+            onClick={() => openLogForm(null)}
+            type="button"
+          >
+            Log contact
+          </button>
         </div>
 
         <ContactGroups
           groups={contactGroups}
-          onLogEmailSent={isActive ? (roleId) => openLogForm(roleId, "email", "outbound") : undefined}
+          onLogEmailSent={(roleId) => openLogForm(roleId, "email", "outbound")}
           preferences={preferences}
         />
       </div>
@@ -1494,7 +1427,6 @@ export function DivisionContactsAndOutreach({
 // ── School contacts and outreach panel ────────────────────────────────────────
 
 export function SchoolContactsAndOutreach({
-  activatableOpportunityId,
   contactGroupings,
   contactRoleOptions,
   isActive,
@@ -1503,10 +1435,8 @@ export function SchoolContactsAndOutreach({
   outreachSummary,
   preferences,
   routeOptions,
-  sourcePlaceholder,
-  workspacePath
+  sourcePlaceholder
 }: {
-  activatableOpportunityId: string | null;
   contactGroupings: SchoolContactGroupings;
   contactRoleOptions: Array<{ id: string; label: string }>;
   isActive: boolean;
@@ -1516,7 +1446,6 @@ export function SchoolContactsAndOutreach({
   preferences: Json | null | undefined;
   routeOptions?: OutreachRouteOption[];
   sourcePlaceholder?: string;
-  workspacePath: string;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
@@ -1539,13 +1468,11 @@ export function SchoolContactsAndOutreach({
     <>
       <div className="space-y-5">
         <ContactsAndOutreachSummaryGrid
-          activatableOpportunityId={activatableOpportunityId}
           isActive={isActive}
           organizationId={organizationId}
           outreachSummary={outreachSummary}
           contactRoleOptions={contactRoleOptions}
           routeOptions={routeOptions}
-          workspacePath={workspacePath}
         />
 
         <div className="flex flex-wrap gap-2">
@@ -1556,20 +1483,18 @@ export function SchoolContactsAndOutreach({
           >
             + Add contact
           </button>
-          {isActive ? (
-            <button
-              className="rounded-control border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-body hover:bg-gray-50"
-              onClick={() => openLogForm(null)}
-              type="button"
-            >
-              Log contact
-            </button>
-          ) : null}
+          <button
+            className="rounded-control border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-body hover:bg-gray-50"
+            onClick={() => openLogForm(null)}
+            type="button"
+          >
+            Log contact
+          </button>
         </div>
 
         <SchoolContactSection
           contactGroupings={contactGroupings}
-          onLogEmailSent={isActive ? (roleId) => openLogForm(roleId, "email", "outbound") : undefined}
+          onLogEmailSent={(roleId) => openLogForm(roleId, "email", "outbound")}
           preferences={preferences}
         />
       </div>
