@@ -22,6 +22,18 @@ const APPROVAL_ID = "12121212-1212-1212-1212-121212121212";
 const IMPORT_LINK_ID = "13131313-1313-1313-1313-131313131313";
 const OPPORTUNITY_RECORD_TYPE = "262d5592-240b-44a2-afa1-6b2e208a43b4";
 
+const PROFILE_FOREIGN_KEYS = [
+  { column: "user_id", refTable: "profiles", table: "activities" },
+  { column: "created_by", refTable: "profiles", table: "activities" },
+  { column: "created_by", refTable: "profiles", table: "tasks" },
+  { column: "created_by", refTable: "profiles", table: "opportunity_approval_items" },
+  { column: "created_by", refTable: "profiles", table: "opportunities" },
+  { column: "added_to_pipeline_by", refTable: "profiles", table: "opportunities" },
+  { column: "created_by", refTable: "profiles", table: "organization_outreach" },
+  { column: "status_changed_by", refTable: "profiles", table: "organization_outreach" },
+  { column: "record_type_id", refTable: "record_type_registry", table: "import_row_links" }
+];
+
 function rowsByTable(data: Record<string, Record<string, unknown>[]>): Map<string, Record<string, unknown>[]> {
   return new Map(Object.entries(data));
 }
@@ -84,7 +96,8 @@ describe("buildTestUserExclusionPlan", () => {
     const exclusion = buildTestUserExclusionPlan(
       plans,
       parseExcludedSourceProfileIds(`${TEST_PROFILE_A},${TEST_PROFILE_B}`),
-      recordTypes()
+      recordTypes(),
+      PROFILE_FOREIGN_KEYS
     );
 
     assert.ok(exclusion.excludedByTable.get("opportunities")?.has(OPP_TEST_ID));
@@ -124,7 +137,8 @@ describe("buildTestUserExclusionPlan", () => {
     const exclusion = buildTestUserExclusionPlan(
       plans,
       parseExcludedSourceProfileIds(`${TEST_PROFILE_A},${TEST_PROFILE_B}`),
-      recordTypes()
+      recordTypes(),
+      PROFILE_FOREIGN_KEYS
     );
 
     assert.equal(exclusion.excludedByTable.has("organizations"), false);
@@ -158,7 +172,8 @@ describe("buildTestUserExclusionPlan", () => {
         ]
       }),
       parseExcludedSourceProfileIds(TEST_PROFILE_A),
-      recordTypes()
+      recordTypes(),
+      PROFILE_FOREIGN_KEYS
     );
 
     assert.equal(exclusion.researchConflicts.length, 1);

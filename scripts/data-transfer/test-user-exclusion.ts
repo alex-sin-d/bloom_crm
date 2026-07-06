@@ -1,3 +1,5 @@
+import { normalizeRelationName } from "./schema.js";
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Workflow tables whose rows may be excluded when tied to test users. */
@@ -31,15 +33,13 @@ export const PRESERVED_DOMAIN_TABLES = new Set([
 ]);
 
 const OPPORTUNITY_CHILD_TABLES = [
-  "activities",
   "audit_log",
   "import_row_links",
   "imported_research_scores",
   "opportunity_approval_items",
   "opportunity_product_fit",
   "research_gaps",
-  "source_links",
-  "tasks"
+  "source_links"
 ] as const;
 
 export interface ExcludedRowDetail {
@@ -81,7 +81,9 @@ export function parseExcludedSourceProfileIds(raw: string | undefined): Set<stri
 
 function rowId(row: Record<string, unknown>): string | undefined {
   const id = row.id;
-  return typeof id === "string" ? id : undefined;
+  if (typeof id === "string") return id;
+  if (id !== null && id !== undefined) return String(id);
+  return undefined;
 }
 
 function profileValue(value: unknown): string | undefined {
@@ -112,6 +114,27 @@ function isExcluded(excludedByTable: Map<string, Set<string>>, table: string, id
   return id !== undefined && (excludedByTable.get(table)?.has(id) ?? false);
 }
 
+function profileColumnsForTable(
+  table: string,
+  foreignKeys: Array<{ column: string; refTable: string; table: string }>
+): string[] {
+  return foreignKeys
+    .filter((edge) => normalizeRelationName(edge.table) === table && normalizeRelationName(edge.refTable) === "profiles")
+    .map((edge) => edge.column);
+}
+
+function rowReferencesExcludedProfile(
+  row: Record<string, unknown>,
+  profileColumns: string[],
+  excludedProfileIds: Set<string>
+): string | undefined {
+  for (const column of profileColumns) {
+    const matched = matchesExcludedProfile(row[column], excludedProfileIds);
+    if (matched) return matched;
+  }
+  return undefined;
+}
+
 function isOpportunityTestWorkflow(row: Record<string, unknown>, excludedProfileIds: Set<string>): string | undefined {
   const addedBy = matchesExcludedProfile(row.added_to_pipeline_by, excludedProfileIds);
   if (addedBy) return addedBy;
@@ -128,30 +151,33 @@ function isOpportunityTestWorkflow(row: Record<string, unknown>, excludedProfile
   return undefined;
 }
 
+const WORKFLOW_OWNERSHIP_COLUMNS: Record<string, string[]> = {
+  activities: ["user_id", "created_by"],
+  audit_log: ["user_id"],
+  organization_outreach: ["created_by", "status_changed_by"],
+  tasks: ["created_by"]
+};
+
+function seedExclusionProfileColumns(
+  table: string,
+  foreignKeys: Array<{ column: string; refTable: string; table: string }>
+): string[] {
+  const available = profileColumnsForTable(table, foreignKeys);
+  const preferred = WORKFLOW_OWNERSHIP_COLUMNS[table] ?? ["created_by"];
+  return preferred.filter((column) => available.includes(column));
+}
+
 function isDirectTestWorkflowRow(
   table: string,
   row: Record<string, unknown>,
-  excludedProfileIds: Set<string>
+  excludedProfileIds: Set<string>,
+  foreignKeys: Array<{ column: string; refTable: string; table: string }>
 ): string | undefined {
-  switch (table) {
-    case "opportunities":
-      return isOpportunityTestWorkflow(row, excludedProfileIds);
-    case "activities":
-      return matchesExcludedProfile(row.user_id, excludedProfileIds) ?? matchesExcludedProfile(row.created_by, excludedProfileIds);
-    case "tasks":
-      return matchesExcludedProfile(row.created_by, excludedProfileIds);
-    case "organization_outreach":
-      return (
-        matchesExcludedProfile(row.created_by, excludedProfileIds) ??
-        matchesExcludedProfile(row.status_changed_by, excludedProfileIds)
-      );
-    case "research_gaps":
-      return matchesExcludedProfile(row.created_by, excludedProfileIds);
-    case "audit_log":
-      return matchesExcludedProfile(row.user_id, excludedProfileIds);
-    default:
-      return matchesExcludedProfile(row.created_by, excludedProfileIds);
+  if (table === "opportunities") {
+    return isOpportunityTestWorkflow(row, excludedProfileIds);
   }
+
+  return rowReferencesExcludedProfile(row, seedExclusionProfileColumns(table, foreignKeys), excludedProfileIds);
 }
 
 function recordReference(
@@ -198,7 +224,8 @@ function wouldLoseRealResearchGap(
 export function buildTestUserExclusionPlan(
   rowsByTable: Map<string, Record<string, unknown>[]>,
   excludedProfileIds: Set<string>,
-  recordTypeIdToTableName: Map<string, string>
+  recordTypeIdToTableName: Map<string, string>,
+  foreignKeys: Array<{ column: string; refTable: string; table: string }> = []
 ): TestUserExclusionResult {
   if (excludedProfileIds.size === 0) {
     return { excludedByTable: new Map(), excludedDetails: [], researchConflicts: [] };
@@ -212,7 +239,7 @@ export function buildTestUserExclusionPlan(
     for (const row of rowsByTable.get(table) ?? []) {
       const id = rowId(row);
       if (!id) continue;
-      const matchedProfileId = isDirectTestWorkflowRow(table, row, excludedProfileIds);
+      const matchedProfileId = isDirectTestWorkflowRow(table, row, excludedProfileIds, foreignKeys);
       if (matchedProfileId) {
         addExclusion(
           excludedByTable,
@@ -258,17 +285,6 @@ export function buildTestUserExclusionPlan(
             addExclusion(excludedByTable, excludedDetails, childTable, id, `references excluded opportunity ${opportunityId}`);
             changed = true;
           }
-        }
-      }
-    }
-
-    for (const activityId of excludedByTable.get("activities") ?? []) {
-      for (const row of rowsByTable.get("tasks") ?? []) {
-        const id = rowId(row);
-        if (!id || isExcluded(excludedByTable, "tasks", id)) continue;
-        if (row.related_activity_id === activityId) {
-          addExclusion(excludedByTable, excludedDetails, "tasks", id, `references excluded activity ${activityId}`);
-          changed = true;
         }
       }
     }
@@ -361,9 +377,11 @@ export function sanitizeExcludedForeignKeyReferences(
   excludedByTable: Map<string, Set<string>>
 ): void {
   for (const foreignKey of foreignKeys) {
-    const excludedRefIds = excludedByTable.get(foreignKey.refTable);
+    const table = normalizeRelationName(foreignKey.table);
+    const refTable = normalizeRelationName(foreignKey.refTable);
+    const excludedRefIds = excludedByTable.get(refTable);
     if (!excludedRefIds || excludedRefIds.size === 0) continue;
-    const plan = plans.get(foreignKey.table);
+    const plan = plans.get(table);
     if (!plan) continue;
 
     for (const row of plan.rows) {
@@ -380,7 +398,7 @@ export function sanitizeExcludedProfileReferences(
   profileColumns: string[],
   excludedProfileIds: Set<string>
 ): void {
-  if (excludedProfileIds.size === 0) return;
+  if (excludedProfileIds.size === 0 || profileColumns.length === 0) return;
   for (const row of rows) {
     for (const column of profileColumns) {
       const matched = matchesExcludedProfile(row[column], excludedProfileIds);

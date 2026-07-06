@@ -52,6 +52,7 @@ import {
 import {
   buildProfileMap,
   formatUnresolvedProfileError,
+  lookupProfileMap,
   parseProfileRemaps,
   type ProfileRemapEntry
 } from "./profile-remap.js";
@@ -63,13 +64,15 @@ import {
   parseExcludedSourceProfileIds,
   sanitizeExcludedForeignKeyReferences,
   sanitizeExcludedProfileReferences,
-  type ExcludedRowDetail
+  type ExcludedRowDetail,
+  type TestUserExclusionResult
 } from "./test-user-exclusion.js";
 import {
   listInsertableColumns,
   listJsonColumnTypes,
   listPublicTables,
   loadPublicForeignKeys,
+  normalizeRelationName,
   quoteIdent,
   tableRowCount,
   type ForeignKeyColumn
@@ -90,6 +93,8 @@ interface TableTransferPlan {
   jsonColumns: Set<string>;
   rows: Record<string, unknown>[];
 }
+
+export type { TableTransferPlan };
 
 export interface TransferReport {
   committed: boolean;
@@ -137,13 +142,137 @@ function parseFlags(argv: string[]): Flags {
   };
 }
 
+export { parseFlags };
+
 function resolveExcludedSourceProfileIds(flags: Flags, options: RunOptions): Set<string> {
   const raw = options.excludedSourceProfileIds ?? flags.excludeSourceProfileIds ?? process.env.EXCLUDED_SOURCE_PROFILE_IDS;
   return parseExcludedSourceProfileIds(raw);
 }
 
+export { resolveExcludedSourceProfileIds };
+
 function profileColumnsForTable(table: string, foreignKeys: ForeignKeyColumn[]): string[] {
-  return foreignKeys.filter((edge) => edge.table === table && edge.refTable === "profiles").map((edge) => edge.column);
+  return foreignKeys
+    .filter((edge) => normalizeRelationName(edge.table) === table && normalizeRelationName(edge.refTable) === "profiles")
+    .map((edge) => edge.column);
+}
+
+export interface ExclusionRemapResult {
+  excludedRowCounts: Array<{ excluded: number; table: string; transferred: number }>;
+  exclusionPlan: TestUserExclusionResult;
+  rowsByTable: Map<string, Record<string, unknown>[]>;
+  unresolved: Array<{ column: string; table: string; value: unknown }>;
+}
+
+export function applyExclusionsRemapAndValidateProfiles(input: {
+  excludedSourceProfileIds: Set<string>;
+  foreignKeys: ForeignKeyColumn[];
+  plans: Map<string, TableTransferPlan>;
+  profileMap: Map<string, string>;
+  rawRowsByTable: Map<string, Record<string, unknown>[]>;
+  recordTypeIdToTableName: Map<string, string>;
+  recordTypeMap: Map<string, string>;
+  transferTableSet: Set<string>;
+}): ExclusionRemapResult {
+  const {
+    excludedSourceProfileIds,
+    foreignKeys,
+    plans,
+    profileMap,
+    rawRowsByTable,
+    recordTypeIdToTableName,
+    recordTypeMap,
+    transferTableSet
+  } = input;
+
+  const exclusionPlan = buildTestUserExclusionPlan(
+    rawRowsByTable,
+    excludedSourceProfileIds,
+    recordTypeIdToTableName,
+    foreignKeys
+  );
+  if (exclusionPlan.researchConflicts.length > 0) {
+    throw new Error(formatResearchConflictError(exclusionPlan.researchConflicts));
+  }
+
+  const excludedBeforeCounts = new Map<string, number>();
+  for (const [table, plan] of plans) {
+    excludedBeforeCounts.set(table, plan.rows.length);
+  }
+  applyTestUserExclusions(plans, exclusionPlan);
+
+  for (const [table, plan] of plans) {
+    sanitizeExcludedProfileReferences(plan.rows, profileColumnsForTable(table, foreignKeys), excludedSourceProfileIds);
+  }
+  sanitizeExcludedForeignKeyReferences(plans, foreignKeys, exclusionPlan.excludedByTable);
+
+  const rowsByTable = new Map<string, Record<string, unknown>[]>();
+  const unresolved: Array<{ column: string; table: string; value: unknown }> = [];
+
+  for (const [table, plan] of plans) {
+    const remaps = remapColumnsForTable(table, foreignKeys, transferTableSet);
+    for (const row of plan.rows) {
+      for (const remap of remaps) {
+        const value = row[remap.column];
+        if (value === null || value === undefined) continue;
+
+        if (remap.refTable === "profiles") {
+          const profileId = String(value).toLowerCase();
+          if (excludedSourceProfileIds.has(profileId)) {
+            row[remap.column] = null;
+            continue;
+          }
+          const mapped = lookupProfileMap(profileMap, value);
+          if (mapped === undefined) {
+            unresolved.push({ column: remap.column, table, value });
+            continue;
+          }
+          row[remap.column] = mapped;
+          continue;
+        }
+
+        const mapped = recordTypeMap.get(String(value));
+        if (mapped === undefined) {
+          unresolved.push({ column: remap.column, table, value });
+          continue;
+        }
+        row[remap.column] = mapped;
+      }
+    }
+    rowsByTable.set(table, plan.rows);
+  }
+
+  const excludedRowCounts = [...excludedBeforeCounts.entries()]
+    .map(([table, beforeCount]) => ({
+      excluded: beforeCount - (plans.get(table)?.rows.length ?? 0),
+      table,
+      transferred: plans.get(table)?.rows.length ?? 0
+    }))
+    .filter((entry) => entry.excluded > 0)
+    .sort((left, right) => left.table.localeCompare(right.table));
+
+  return { excludedRowCounts, exclusionPlan, rowsByTable, unresolved };
+}
+
+function printExclusionSummary(
+  excludedSourceProfileIds: Set<string>,
+  exclusionPlan: TestUserExclusionResult,
+  excludedRowCounts: Array<{ excluded: number; table: string; transferred: number }>
+): void {
+  if (excludedSourceProfileIds.size === 0) return;
+
+  console.log("\nExcluded source test profile ids:");
+  for (const profileId of excludedSourceProfileIds) {
+    console.log(`  ${profileId}`);
+  }
+  console.log("\nRows excluded because of test users:");
+  console.log(formatExcludedRowsReport(exclusionPlan.excludedDetails));
+  if (excludedRowCounts.length > 0) {
+    console.log("\nExcluded row counts (before profile validation):");
+    for (const entry of excludedRowCounts) {
+      console.log(`  ${entry.table}: excluded ${entry.excluded}, transferring ${entry.transferred}`);
+    }
+  }
 }
 
 function requireEnv(name: string): string {
@@ -210,8 +339,16 @@ function remapColumnsForTable(
   transferTables: Set<string>
 ): Array<{ column: string; refTable: "profiles" | "record_type_registry" }> {
   return edges
-    .filter((edge) => edge.table === table && transferTables.has(edge.table) && REMAP_REF_TABLES.has(edge.refTable))
-    .map((edge) => ({ column: edge.column, refTable: edge.refTable as "profiles" | "record_type_registry" }));
+    .filter(
+      (edge) =>
+        normalizeRelationName(edge.table) === table &&
+        transferTables.has(table) &&
+        REMAP_REF_TABLES.has(normalizeRelationName(edge.refTable))
+    )
+    .map((edge) => ({
+      column: edge.column,
+      refTable: normalizeRelationName(edge.refTable) as "profiles" | "record_type_registry"
+    }));
 }
 
 function collectDeferredValues(
@@ -394,42 +531,19 @@ export async function run(
     plans.set(table, { columns: sourceColumns, jsonColumns, rows: rows.map((row) => ({ ...row })) });
   }
 
-  const exclusionPlan = buildTestUserExclusionPlan(rawRowsByTable, excludedSourceProfileIds, recordTypeIdToTableName);
-  if (exclusionPlan.researchConflicts.length > 0) {
-    throw new Error(formatResearchConflictError(exclusionPlan.researchConflicts));
-  }
+  const exclusionRemap = applyExclusionsRemapAndValidateProfiles({
+    excludedSourceProfileIds,
+    foreignKeys,
+    plans,
+    profileMap,
+    rawRowsByTable,
+    recordTypeIdToTableName,
+    recordTypeMap,
+    transferTableSet
+  });
+  const { excludedRowCounts, exclusionPlan, rowsByTable, unresolved } = exclusionRemap;
 
-  const excludedBeforeCounts = new Map<string, number>();
-  for (const [table, plan] of plans) {
-    excludedBeforeCounts.set(table, plan.rows.length);
-  }
-  applyTestUserExclusions(plans, exclusionPlan);
-
-  for (const [table, plan] of plans) {
-    sanitizeExcludedProfileReferences(plan.rows, profileColumnsForTable(table, foreignKeys), excludedSourceProfileIds);
-  }
-  sanitizeExcludedForeignKeyReferences(plans, foreignKeys, exclusionPlan.excludedByTable);
-
-  const rowsByTable = new Map<string, Record<string, unknown>[]>();
-  const unresolved: Array<{ column: string; table: string; value: unknown }> = [];
-
-  for (const [table, plan] of plans) {
-    const remaps = remapColumnsForTable(table, foreignKeys, transferTableSet);
-    for (const row of plan.rows) {
-      for (const remap of remaps) {
-        const value = row[remap.column];
-        if (value === null || value === undefined) continue;
-        const map = remap.refTable === "profiles" ? profileMap : recordTypeMap;
-        const mapped = map.get(String(value));
-        if (mapped === undefined) {
-          unresolved.push({ column: remap.column, table, value });
-          continue;
-        }
-        row[remap.column] = mapped;
-      }
-    }
-    rowsByTable.set(table, plan.rows);
-  }
+  printExclusionSummary(excludedSourceProfileIds, exclusionPlan, excludedRowCounts);
 
   if (unresolved.length > 0) {
     throw new Error(formatUnresolvedProfileError(unresolved, sourceProfiles));
@@ -458,14 +572,6 @@ export async function run(
 
   const deferredValues = collectDeferredValues(plans, deferredForeignKeys);
   const summary = insertOrder.map((table) => ({ rows: plans.get(table)!.rows.length, table }));
-  const excludedRowCounts = [...excludedBeforeCounts.entries()]
-    .map(([table, beforeCount]) => ({
-      excluded: beforeCount - (plans.get(table)?.rows.length ?? 0),
-      table,
-      transferred: plans.get(table)?.rows.length ?? 0
-    }))
-    .filter((entry) => entry.excluded > 0)
-    .sort((left, right) => left.table.localeCompare(right.table));
 
   const reportBase = {
     cycleDescription: insertPlanReport.cycleDescription,
@@ -533,18 +639,7 @@ function printReport(report: TransferReport, flags: Flags): void {
     }
   }
   if (report.excludedSourceProfileIds.length > 0) {
-    console.log("\nExcluded source test profile ids:");
-    for (const profileId of report.excludedSourceProfileIds) {
-      console.log(`  ${profileId}`);
-    }
-    console.log("\nRows excluded because of test users:");
-    console.log(formatExcludedRowsReport(report.excludedRows));
-    if (report.excludedRowCounts.length > 0) {
-      console.log("\nExcluded row counts:");
-      for (const entry of report.excludedRowCounts) {
-        console.log(`  ${entry.table}: excluded ${entry.excluded}, transferring ${entry.transferred}`);
-      }
-    }
+    console.log("\n(Exclusion summary was printed before profile validation.)");
   }
   console.log("\nProfile remap (source -> production):");
   if (report.profileRemaps.length === 0) {

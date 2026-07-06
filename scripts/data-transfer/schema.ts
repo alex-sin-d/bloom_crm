@@ -8,6 +8,12 @@ export interface ForeignKeyColumn {
   table: string;
 }
 
+/** Strip a Postgres regclass schema prefix so `public.tasks` matches `tasks`. */
+export function normalizeRelationName(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot >= 0 ? name.slice(dot + 1) : name;
+}
+
 // Introspects every foreign key in the `public` schema directly from the
 // Postgres catalog, so this stays correct as the schema evolves - nothing
 // about individual tables/columns is hardcoded here.
@@ -42,9 +48,9 @@ export async function loadPublicForeignKeys(client: Client): Promise<ForeignKeyC
   return rows.map((row) => ({
     column: row.column_name,
     isNullable: row.is_nullable === "YES",
-    refColumn: row.ref_column_name,
-    refTable: row.ref_table_name,
-    table: row.table_name
+    refColumn: normalizeRelationName(row.ref_column_name),
+    refTable: normalizeRelationName(row.ref_table_name),
+    table: normalizeRelationName(row.table_name)
   }));
 }
 

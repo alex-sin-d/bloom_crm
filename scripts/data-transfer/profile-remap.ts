@@ -133,6 +133,12 @@ export function buildProfileMap(
   return { entries, map };
 }
 
+export function lookupProfileMap(map: Map<string, string>, value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  const id = String(value);
+  return map.get(id) ?? map.get(id.toLowerCase());
+}
+
 export function formatUnresolvedProfileError(
   unresolved: Array<{ column: string; table: string; value: unknown }>,
   sourceProfiles: SourceProfile[]
