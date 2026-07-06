@@ -196,3 +196,104 @@ describe("data transfer integration", { skip: integrationUrls() === null }, () =
     }
   });
 });
+
+const TEST_PROFILE_IDS =
+  "9b54ff2c-b0e0-4e77-99b9-cbaa7d25c57f,54599bc9-fa11-4a45-85ac-b79e62461de3";
+
+describe("data transfer test-user exclusion integration", { skip: integrationUrls() === null }, () => {
+  const urls = integrationUrls()!;
+  let source: Client | undefined;
+  let target: Client | undefined;
+  let ready = false;
+
+  before(async () => {
+    source = (await connectOrSkip(urls.sourceUrl)) ?? undefined;
+    target = (await connectOrSkip(urls.targetUrl)) ?? undefined;
+    if (!source || !target) return;
+
+    await ensureTargetProfiles(source, target);
+    await wipeTransferTables(target);
+    await assertTargetEmpty(target);
+    ready = true;
+  });
+
+  after(async () => {
+    if (target && ready) await wipeTransferTables(target).catch(() => undefined);
+    await source?.end().catch(() => undefined);
+    await target?.end().catch(() => undefined);
+  });
+
+  it("dry run reports excluded test-user workflow rows without writing", async () => {
+    if (!ready || !source || !target) return;
+    const beforeCounts = await countTransferTables(target);
+    const report = await run(
+      source,
+      target,
+      { allowLocalTarget: true, dryRun: true, force: false },
+      { excludedSourceProfileIds: TEST_PROFILE_IDS }
+    );
+
+    assert.equal(report.committed, false);
+    assert.deepEqual(report.excludedSourceProfileIds, TEST_PROFILE_IDS.split(","));
+    assert.ok(report.excludedRows.length > 0);
+    assert.ok(report.excludedRowCounts.some((entry) => entry.table === "opportunities" && entry.excluded > 0));
+
+    const afterCounts = await countTransferTables(target);
+    assert.deepEqual([...afterCounts.entries()], [...beforeCounts.entries()]);
+  });
+
+  it("live rehearsal excludes test workflow rows but keeps org/contact data", async () => {
+    if (!ready || !source || !target) return;
+    await wipeTransferTables(target);
+    await assertTargetEmpty(target);
+
+    const report = await run(
+      source,
+      target,
+      { allowLocalTarget: true, dryRun: false, force: false },
+      { excludedSourceProfileIds: TEST_PROFILE_IDS }
+    );
+    assert.equal(report.committed, true);
+
+    const [{ rows: sourceOrgs }, { rows: targetOrgs }] = await Promise.all([
+      source.query<{ id: string }>("select id from public.organizations"),
+      target.query<{ id: string }>("select id from public.organizations")
+    ]);
+    assert.equal(targetOrgs.length, sourceOrgs.length);
+
+    const [{ rows: sourcePeople }, { rows: targetPeople }] = await Promise.all([
+      source.query<{ id: string }>("select id from public.people"),
+      target.query<{ id: string }>("select id from public.people")
+    ]);
+    assert.equal(targetPeople.length, sourcePeople.length);
+
+    const [{ rows: sourceOpportunities }, { rows: targetOpportunities }] = await Promise.all([
+      source.query<{ id: string }>("select id from public.opportunities"),
+      target.query<{ id: string }>("select id from public.opportunities")
+    ]);
+    assert.ok(targetOpportunities.length < sourceOpportunities.length);
+    assert.equal(
+      report.summary.find((entry) => entry.table === "opportunities")!.rows,
+      targetOpportunities.length
+    );
+  });
+
+  it("transaction rollback stays empty after induced failure with exclusions enabled", async () => {
+    if (!ready || !source || !target) return;
+    await wipeTransferTables(target);
+    await assertTargetEmpty(target);
+
+    await assert.rejects(
+      () =>
+        run(
+          source!,
+          target!,
+          { allowLocalTarget: true, dryRun: false, force: false },
+          { excludedSourceProfileIds: TEST_PROFILE_IDS, failAfterTable: "audit_log" }
+        ),
+      /Induced transfer failure/
+    );
+
+    await assertTargetEmpty(target);
+  });
+});

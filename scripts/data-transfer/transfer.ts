@@ -19,8 +19,11 @@
 //   - profiles, profile_preferences, and saved_views are never copied -
 //     production users are created separately (see scripts/admin), and
 //     every created_by/updated_by/etc. column that references profiles.id
-//     is remapped to the matching production profile (matched by id first,
-//     then by email) before any row is written.
+//     is remapped to the matching production profile (same id reuse, or an
+//     explicit PROFILE_REMAPS entry) before any row is written.
+//   - EXCLUDED_SOURCE_PROFILE_IDS (or --exclude-source-profiles=...) omits
+//     local test-user workflow rows and their dependent records from the
+//     transfer instead of creating production users for them.
 //   - record_type_registry is never copied (each database generates its
 //     own ids for those rows via migrations) - every record_type_id-style
 //     column is remapped by joining on table_name before any row is
@@ -47,6 +50,22 @@ import {
   type DeferredForeignKey
 } from "./insert-plan.js";
 import {
+  buildProfileMap,
+  formatUnresolvedProfileError,
+  parseProfileRemaps,
+  type ProfileRemapEntry
+} from "./profile-remap.js";
+import {
+  applyTestUserExclusions,
+  buildTestUserExclusionPlan,
+  formatExcludedRowsReport,
+  formatResearchConflictError,
+  parseExcludedSourceProfileIds,
+  sanitizeExcludedForeignKeyReferences,
+  sanitizeExcludedProfileReferences,
+  type ExcludedRowDetail
+} from "./test-user-exclusion.js";
+import {
   listInsertableColumns,
   listJsonColumnTypes,
   listPublicTables,
@@ -62,6 +81,7 @@ const REMAP_REF_TABLES = new Set(["profiles", "record_type_registry"]);
 export interface Flags {
   allowLocalTarget: boolean;
   dryRun: boolean;
+  excludeSourceProfileIds?: string;
   force: boolean;
 }
 
@@ -75,8 +95,12 @@ export interface TransferReport {
   committed: boolean;
   cycleDescription: string;
   deferredForeignKeys: DeferredForeignKey[];
+  excludedRowCounts: Array<{ excluded: number; table: string; transferred: number }>;
+  excludedRows: ExcludedRowDetail[];
+  excludedSourceProfileIds: string[];
   insertStrategy: "topological" | "staged_null_backfill";
   profileMap: Map<string, string>;
+  profileRemaps: ProfileRemapEntry[];
   recordTypeMap: Map<string, string>;
   summary: Array<{ rows: number; table: string }>;
 }
@@ -84,6 +108,10 @@ export interface TransferReport {
 export interface RunOptions {
   /** Test hook: throw after inserting this table to verify rollback. */
   failAfterTable?: string;
+  /** Override EXCLUDED_SOURCE_PROFILE_IDS parsing in tests. */
+  excludedSourceProfileIds?: string;
+  /** Override PROFILE_REMAPS parsing in tests. */
+  profileRemaps?: string;
 }
 
 interface DeferredValue {
@@ -94,11 +122,28 @@ interface DeferredValue {
 }
 
 function parseFlags(argv: string[]): Flags {
+  let excludeSourceProfileIds: string | undefined;
+  for (const arg of argv) {
+    if (arg.startsWith("--exclude-source-profiles=")) {
+      excludeSourceProfileIds = arg.slice("--exclude-source-profiles=".length);
+    }
+  }
+
   return {
     allowLocalTarget: argv.includes("--allow-local-target"),
     dryRun: argv.includes("--dry-run"),
+    excludeSourceProfileIds,
     force: argv.includes("--force")
   };
+}
+
+function resolveExcludedSourceProfileIds(flags: Flags, options: RunOptions): Set<string> {
+  const raw = options.excludedSourceProfileIds ?? flags.excludeSourceProfileIds ?? process.env.EXCLUDED_SOURCE_PROFILE_IDS;
+  return parseExcludedSourceProfileIds(raw);
+}
+
+function profileColumnsForTable(table: string, foreignKeys: ForeignKeyColumn[]): string[] {
+  return foreignKeys.filter((edge) => edge.table === table && edge.refTable === "profiles").map((edge) => edge.column);
 }
 
 function requireEnv(name: string): string {
@@ -116,25 +161,18 @@ export function isLocalPostgresUrl(url: string): boolean {
   }
 }
 
-async function buildProfileMap(source: Client, target: Client): Promise<Map<string, string>> {
+async function loadProfileMap(
+  source: Client,
+  target: Client,
+  profileRemapsRaw: string | undefined
+): Promise<{ map: Map<string, string>; remaps: ProfileRemapEntry[]; sourceProfiles: Array<{ email: string; id: string }> }> {
   const [{ rows: sourceProfiles }, { rows: targetProfiles }] = await Promise.all([
     source.query<{ email: string; id: string }>("select id, email from public.profiles"),
     target.query<{ email: string; id: string }>("select id, email from public.profiles")
   ]);
 
-  const targetIds = new Set(targetProfiles.map((profile) => profile.id));
-  const targetIdByEmail = new Map(targetProfiles.map((profile) => [profile.email.toLowerCase(), profile.id]));
-
-  const map = new Map<string, string>();
-  for (const profile of sourceProfiles) {
-    if (targetIds.has(profile.id)) {
-      map.set(profile.id, profile.id);
-      continue;
-    }
-    const matchByEmail = targetIdByEmail.get(profile.email.toLowerCase());
-    if (matchByEmail) map.set(profile.id, matchByEmail);
-  }
-  return map;
+  const { entries, map } = buildProfileMap(sourceProfiles, targetProfiles, parseProfileRemaps(profileRemapsRaw));
+  return { map, remaps: entries, sourceProfiles };
 }
 
 async function buildRecordTypeMap(source: Client, target: Client): Promise<Map<string, string>> {
@@ -307,8 +345,8 @@ export async function run(
   const transferTableSet = new Set(transferTables);
 
   const foreignKeys = await loadPublicForeignKeys(source);
-  const [profileMap, recordTypeMap, sourceRecordTypes] = await Promise.all([
-    buildProfileMap(source, target),
+  const [{ map: profileMap, remaps: profileRemaps, sourceProfiles }, recordTypeMap, sourceRecordTypes] = await Promise.all([
+    loadProfileMap(source, target, options.profileRemaps ?? process.env.PROFILE_REMAPS),
     buildRecordTypeMap(source, target),
     source.query<{ id: string; table_name: string }>("select id, table_name from public.record_type_registry")
   ]);
@@ -322,9 +360,17 @@ export async function run(
     if (tableName) recordTypeIdToTableName.set(targetId, tableName);
   }
 
+  const excludedSourceProfileIds = resolveExcludedSourceProfileIds(flags, options);
+  if (excludedSourceProfileIds.size > 0) {
+    for (const profileId of excludedSourceProfileIds) {
+      if (!sourceProfiles.some((profile) => profile.id.toLowerCase() === profileId)) {
+        throw new Error(`EXCLUDED_SOURCE_PROFILE_IDS references unknown local profile ${profileId}.`);
+      }
+    }
+  }
+
+  const rawRowsByTable = new Map<string, Record<string, unknown>[]>();
   const plans = new Map<string, TableTransferPlan>();
-  const unresolved: Array<{ column: string; table: string; value: unknown }> = [];
-  const rowsByTable = new Map<string, Record<string, unknown>[]>();
 
   for (const table of transferTables) {
     const [sourceColumns, targetColumns, jsonColumns] = await Promise.all([
@@ -344,8 +390,32 @@ export async function run(
       `select ${sourceColumns.map(quoteIdent).join(", ")} from public.${quoteIdent(table)}`
     );
 
+    rawRowsByTable.set(table, rows.map((row) => ({ ...row })));
+    plans.set(table, { columns: sourceColumns, jsonColumns, rows: rows.map((row) => ({ ...row })) });
+  }
+
+  const exclusionPlan = buildTestUserExclusionPlan(rawRowsByTable, excludedSourceProfileIds, recordTypeIdToTableName);
+  if (exclusionPlan.researchConflicts.length > 0) {
+    throw new Error(formatResearchConflictError(exclusionPlan.researchConflicts));
+  }
+
+  const excludedBeforeCounts = new Map<string, number>();
+  for (const [table, plan] of plans) {
+    excludedBeforeCounts.set(table, plan.rows.length);
+  }
+  applyTestUserExclusions(plans, exclusionPlan);
+
+  for (const [table, plan] of plans) {
+    sanitizeExcludedProfileReferences(plan.rows, profileColumnsForTable(table, foreignKeys), excludedSourceProfileIds);
+  }
+  sanitizeExcludedForeignKeyReferences(plans, foreignKeys, exclusionPlan.excludedByTable);
+
+  const rowsByTable = new Map<string, Record<string, unknown>[]>();
+  const unresolved: Array<{ column: string; table: string; value: unknown }> = [];
+
+  for (const [table, plan] of plans) {
     const remaps = remapColumnsForTable(table, foreignKeys, transferTableSet);
-    for (const row of rows) {
+    for (const row of plan.rows) {
       for (const remap of remaps) {
         const value = row[remap.column];
         if (value === null || value === undefined) continue;
@@ -358,23 +428,11 @@ export async function run(
         row[remap.column] = mapped;
       }
     }
-
-    plans.set(table, { columns: sourceColumns, jsonColumns, rows });
-    rowsByTable.set(table, rows);
+    rowsByTable.set(table, plan.rows);
   }
 
   if (unresolved.length > 0) {
-    const preview = unresolved
-      .slice(0, 20)
-      .map((entry) => `  ${entry.table}.${entry.column} = ${String(entry.value)}`)
-      .join("\n");
-    throw new Error(
-      `${unresolved.length} row(s) reference an id this script could not resolve in the target ` +
-        `(showing first ${Math.min(20, unresolved.length)}):\n${preview}\n` +
-        "This usually means the row was created/edited by a local profile that has no matching " +
-        "production account yet (matched by id, then by email). Create that user in the target " +
-        "first (see scripts/admin), then re-run."
-    );
+    throw new Error(formatUnresolvedProfileError(unresolved, sourceProfiles));
   }
 
   const insertPlanReport = planTransferInsertOrder(
@@ -400,16 +458,32 @@ export async function run(
 
   const deferredValues = collectDeferredValues(plans, deferredForeignKeys);
   const summary = insertOrder.map((table) => ({ rows: plans.get(table)!.rows.length, table }));
+  const excludedRowCounts = [...excludedBeforeCounts.entries()]
+    .map(([table, beforeCount]) => ({
+      excluded: beforeCount - (plans.get(table)?.rows.length ?? 0),
+      table,
+      transferred: plans.get(table)?.rows.length ?? 0
+    }))
+    .filter((entry) => entry.excluded > 0)
+    .sort((left, right) => left.table.localeCompare(right.table));
+
+  const reportBase = {
+    cycleDescription: insertPlanReport.cycleDescription,
+    deferredForeignKeys,
+    excludedRowCounts,
+    excludedRows: exclusionPlan.excludedDetails,
+    excludedSourceProfileIds: [...excludedSourceProfileIds],
+    insertStrategy: insertPlanReport.strategy,
+    profileMap,
+    profileRemaps,
+    recordTypeMap,
+    summary
+  };
 
   if (flags.dryRun) {
     return {
       committed: false,
-      cycleDescription: insertPlanReport.cycleDescription,
-      deferredForeignKeys,
-      insertStrategy: insertPlanReport.strategy,
-      profileMap,
-      recordTypeMap,
-      summary
+      ...reportBase
     };
   }
 
@@ -439,12 +513,7 @@ export async function run(
 
   return {
     committed: true,
-    cycleDescription: insertPlanReport.cycleDescription,
-    deferredForeignKeys,
-    insertStrategy: insertPlanReport.strategy,
-    profileMap,
-    recordTypeMap,
-    summary
+    ...reportBase
   };
 }
 
@@ -463,9 +532,29 @@ function printReport(report: TransferReport, flags: Flags): void {
       console.log(`  ${entry.table}.${entry.column} -> ${entry.refTable}`);
     }
   }
-  console.log("\nProfile id remap (source -> target):");
-  for (const [sourceId, targetId] of report.profileMap) {
-    console.log(`  ${sourceId} -> ${targetId}${sourceId === targetId ? "  (same id reused)" : ""}`);
+  if (report.excludedSourceProfileIds.length > 0) {
+    console.log("\nExcluded source test profile ids:");
+    for (const profileId of report.excludedSourceProfileIds) {
+      console.log(`  ${profileId}`);
+    }
+    console.log("\nRows excluded because of test users:");
+    console.log(formatExcludedRowsReport(report.excludedRows));
+    if (report.excludedRowCounts.length > 0) {
+      console.log("\nExcluded row counts:");
+      for (const entry of report.excludedRowCounts) {
+        console.log(`  ${entry.table}: excluded ${entry.excluded}, transferring ${entry.transferred}`);
+      }
+    }
+  }
+  console.log("\nProfile remap (source -> production):");
+  if (report.profileRemaps.length === 0) {
+    console.log("  (none configured; only same-id profiles were reused)");
+  }
+  for (const entry of report.profileRemaps) {
+    const sameIdNote = entry.via === "same_id" ? "  (same id reused)" : "  (explicit PROFILE_REMAPS)";
+    console.log(
+      `  ${entry.sourceEmail} (${entry.sourceId}) -> ${entry.targetEmail} (${entry.targetId})${sameIdNote}`
+    );
   }
   console.log(`\nrecord_type_registry remap: ${report.recordTypeMap.size} table type(s) matched by name.`);
   console.log("\nRows per table (source -> target order):");
