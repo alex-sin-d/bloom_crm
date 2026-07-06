@@ -6,7 +6,8 @@ import {
   buildTestUserExclusionPlan,
   formatResearchConflictError,
   parseExcludedSourceProfileIds,
-  sanitizeExcludedProfileReferences
+  sanitizeExcludedProfileReferences,
+  validatePolymorphicRecordReferences
 } from "../test-user-exclusion.js";
 
 const TEST_PROFILE_A = "9b54ff2c-b0e0-4e77-99b9-cbaa7d25c57f";
@@ -21,6 +22,9 @@ const GAP_ID = "ffffffff-ffff-ffff-ffff-ffffffffffff";
 const APPROVAL_ID = "12121212-1212-1212-1212-121212121212";
 const IMPORT_LINK_ID = "13131313-1313-1313-1313-131313131313";
 const OPPORTUNITY_RECORD_TYPE = "262d5592-240b-44a2-afa1-6b2e208a43b4";
+const ORG_RECORD_TYPE = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01";
+const FIELD_STATE_OPP_ID = "18181818-1818-1818-1818-181818181818";
+const FIELD_STATE_ORG_ID = "19191919-1919-1919-1919-191919191919";
 
 const PROFILE_FOREIGN_KEYS = [
   { column: "user_id", refTable: "profiles", table: "activities" },
@@ -39,7 +43,10 @@ function rowsByTable(data: Record<string, Record<string, unknown>[]>): Map<strin
 }
 
 function recordTypes(): Map<string, string> {
-  return new Map([[OPPORTUNITY_RECORD_TYPE, "opportunities"]]);
+  return new Map([
+    [OPPORTUNITY_RECORD_TYPE, "opportunities"],
+    [ORG_RECORD_TYPE, "organizations"]
+  ]);
 }
 
 describe("parseExcludedSourceProfileIds", () => {
@@ -179,6 +186,48 @@ describe("buildTestUserExclusionPlan", () => {
     assert.equal(exclusion.researchConflicts.length, 1);
     assert.match(formatResearchConflictError(exclusion.researchConflicts), /real institution research data/);
   });
+
+  it("excludes record_field_state rows that reference excluded workflow records", () => {
+    const exclusion = buildTestUserExclusionPlan(
+      rowsByTable({
+        organizations: [{ id: ORG_ID, created_by: REAL_PROFILE }],
+        opportunities: [
+          {
+            id: OPP_TEST_ID,
+            primary_organization_id: ORG_ID,
+            created_by: TEST_PROFILE_A,
+            research_status: "added_to_pipeline",
+            pipeline_stage: "researching",
+            added_to_pipeline_at: "2026-01-01T00:00:00Z",
+            added_to_pipeline_by: TEST_PROFILE_A
+          }
+        ],
+        record_field_state: [
+          {
+            id: FIELD_STATE_OPP_ID,
+            record_type_id: OPPORTUNITY_RECORD_TYPE,
+            record_id: OPP_TEST_ID,
+            field_name: "pipeline_notes"
+          },
+          {
+            id: FIELD_STATE_ORG_ID,
+            record_type_id: ORG_RECORD_TYPE,
+            record_id: ORG_ID,
+            field_name: "organization_name"
+          }
+        ]
+      }),
+      parseExcludedSourceProfileIds(TEST_PROFILE_A),
+      recordTypes(),
+      PROFILE_FOREIGN_KEYS
+    );
+
+    assert.ok(exclusion.excludedByTable.get("record_field_state")?.has(FIELD_STATE_OPP_ID));
+    assert.equal(exclusion.excludedByTable.get("record_field_state")?.has(FIELD_STATE_ORG_ID), false);
+    const excludedOppFieldState = exclusion.excludedDetails.find((detail) => detail.id === FIELD_STATE_OPP_ID);
+    assert.equal(excludedOppFieldState?.referencedTable, "opportunities");
+    assert.equal(excludedOppFieldState?.referencedRecordId, OPP_TEST_ID);
+  });
 });
 
 describe("applyTestUserExclusions", () => {
@@ -213,5 +262,42 @@ describe("sanitizeExcludedProfileReferences", () => {
     sanitizeExcludedProfileReferences(rows, ["created_by", "updated_by"], parseExcludedSourceProfileIds(TEST_PROFILE_A));
     assert.equal(rows[0]!.created_by, REAL_PROFILE);
     assert.equal(rows[0]!.updated_by, null);
+  });
+});
+
+describe("validatePolymorphicRecordReferences", () => {
+  it("fails when a preserved record_field_state row points at a missing transferred record", () => {
+    const rawRowsByTable = rowsByTable({
+      organizations: [{ id: ORG_ID, created_by: REAL_PROFILE }],
+      record_field_state: [
+        {
+          id: FIELD_STATE_ORG_ID,
+          record_type_id: ORG_RECORD_TYPE,
+          record_id: ORG_ID,
+          field_name: "organization_name"
+        }
+      ]
+    });
+    const plans = new Map([
+      [
+        "record_field_state",
+        {
+          columns: ["id", "record_type_id", "record_id", "field_name"],
+          jsonColumns: new Set<string>(),
+          rows: [{ ...rawRowsByTable.get("record_field_state")![0]! }]
+        }
+      ]
+    ]);
+
+    const conflicts = validatePolymorphicRecordReferences({
+      excludedByTable: new Map(),
+      plans,
+      rawRowsByTable,
+      recordTypeIdToTableName: recordTypes(),
+      transferTableSet: new Set(["organizations", "record_field_state"])
+    });
+
+    assert.equal(conflicts.length, 1);
+    assert.match(conflicts[0]!.message, /missing from the transfer set/);
   });
 });

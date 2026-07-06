@@ -174,7 +174,7 @@ function formatCycleDescription(components: string[][], deferred: DeferredForeig
 }
 
 /** Tables whose record_id is validated by validate_record_reference() at insert time. */
-const POLYMORPHIC_RECORD_REFERENCE_TABLES = new Set([
+export const POLYMORPHIC_RECORD_REFERENCE_TABLES = new Set([
   "audit_log",
   "data_review_items",
   "duplicate_candidate_records",
@@ -185,7 +185,7 @@ const POLYMORPHIC_RECORD_REFERENCE_TABLES = new Set([
   "unresolved_relationships"
 ]);
 
-const POLYMORPHIC_REFERENCE_COLUMN_PAIRS = [
+export const POLYMORPHIC_REFERENCE_COLUMN_PAIRS = [
   ["record_type_id", "record_id"],
   ["suggested_record_type_id", "suggested_record_id"],
   ["resolved_record_type_id", "resolved_record_id"]

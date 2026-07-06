@@ -60,11 +60,16 @@ import {
   applyTestUserExclusions,
   buildTestUserExclusionPlan,
   formatExcludedRowsReport,
+  formatPolymorphicReferenceConflictError,
+  formatRecordFieldStateTransferReport,
   formatResearchConflictError,
   parseExcludedSourceProfileIds,
   sanitizeExcludedForeignKeyReferences,
   sanitizeExcludedProfileReferences,
+  summarizeRecordFieldStateTransfer,
+  validatePolymorphicRecordReferences,
   type ExcludedRowDetail,
+  type RecordFieldStateTransferSummary,
   type TestUserExclusionResult
 } from "./test-user-exclusion.js";
 import {
@@ -106,6 +111,7 @@ export interface TransferReport {
   insertStrategy: "topological" | "staged_null_backfill";
   profileMap: Map<string, string>;
   profileRemaps: ProfileRemapEntry[];
+  recordFieldStateSummary: RecordFieldStateTransferSummary;
   recordTypeMap: Map<string, string>;
   summary: Array<{ rows: number; table: string }>;
 }
@@ -257,7 +263,8 @@ export function applyExclusionsRemapAndValidateProfiles(input: {
 function printExclusionSummary(
   excludedSourceProfileIds: Set<string>,
   exclusionPlan: TestUserExclusionResult,
-  excludedRowCounts: Array<{ excluded: number; table: string; transferred: number }>
+  excludedRowCounts: Array<{ excluded: number; table: string; transferred: number }>,
+  recordFieldStateSummary: RecordFieldStateTransferSummary
 ): void {
   if (excludedSourceProfileIds.size === 0) return;
 
@@ -273,6 +280,8 @@ function printExclusionSummary(
       console.log(`  ${entry.table}: excluded ${entry.excluded}, transferring ${entry.transferred}`);
     }
   }
+  console.log("\nrecord_field_state transfer plan:");
+  console.log(formatRecordFieldStateTransferReport(recordFieldStateSummary));
 }
 
 function requireEnv(name: string): string {
@@ -543,7 +552,24 @@ export async function run(
   });
   const { excludedRowCounts, exclusionPlan, rowsByTable, unresolved } = exclusionRemap;
 
-  printExclusionSummary(excludedSourceProfileIds, exclusionPlan, excludedRowCounts);
+  const recordFieldStateSummary = summarizeRecordFieldStateTransfer(
+    rawRowsByTable.get("record_field_state")?.length ?? 0,
+    plans.get("record_field_state")?.rows.length ?? 0,
+    exclusionPlan.excludedDetails
+  );
+
+  const polymorphicConflicts = validatePolymorphicRecordReferences({
+    excludedByTable: exclusionPlan.excludedByTable,
+    plans,
+    rawRowsByTable,
+    recordTypeIdToTableName,
+    transferTableSet
+  });
+  if (polymorphicConflicts.length > 0) {
+    throw new Error(formatPolymorphicReferenceConflictError(polymorphicConflicts));
+  }
+
+  printExclusionSummary(excludedSourceProfileIds, exclusionPlan, excludedRowCounts, recordFieldStateSummary);
 
   if (unresolved.length > 0) {
     throw new Error(formatUnresolvedProfileError(unresolved, sourceProfiles));
@@ -582,6 +608,7 @@ export async function run(
     insertStrategy: insertPlanReport.strategy,
     profileMap,
     profileRemaps,
+    recordFieldStateSummary,
     recordTypeMap,
     summary
   };
@@ -652,6 +679,10 @@ function printReport(report: TransferReport, flags: Flags): void {
     );
   }
   console.log(`\nrecord_type_registry remap: ${report.recordTypeMap.size} table type(s) matched by name.`);
+  if ((report.recordFieldStateSummary.keptCount + report.recordFieldStateSummary.excludedCount) > 0) {
+    console.log("\nrecord_field_state transfer plan:");
+    console.log(formatRecordFieldStateTransferReport(report.recordFieldStateSummary));
+  }
   console.log("\nRows per table (source -> target order):");
   const totalRows = report.summary.reduce((sum, entry) => sum + entry.rows, 0);
   for (const entry of report.summary) {

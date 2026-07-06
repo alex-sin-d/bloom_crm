@@ -116,7 +116,12 @@ describe("data transfer integration", { skip: integrationUrls() === null }, () =
   it("dry run succeeds without writing", async () => {
     if (!ready || !source || !target) return;
     const beforeCounts = await countTransferTables(target);
-    const report = await run(source, target, { allowLocalTarget: true, dryRun: true, force: false });
+    const report = await run(
+      source,
+      target,
+      { allowLocalTarget: true, dryRun: true, force: false },
+      { excludedSourceProfileIds: "" }
+    );
     assert.equal(report.committed, false);
     assert.equal(report.insertStrategy, "staged_null_backfill");
     assert.ok(report.cycleDescription.includes("contact_roles"));
@@ -135,7 +140,10 @@ describe("data transfer integration", { skip: integrationUrls() === null }, () =
 
     await assert.rejects(
       () =>
-        run(source!, target!, { allowLocalTarget: true, dryRun: false, force: false }, { failAfterTable: "audit_log" }),
+        run(source!, target!, { allowLocalTarget: true, dryRun: false, force: false }, {
+          excludedSourceProfileIds: "",
+          failAfterTable: "audit_log"
+        }),
       /Induced transfer failure/
     );
 
@@ -147,7 +155,12 @@ describe("data transfer integration", { skip: integrationUrls() === null }, () =
     await wipeTransferTables(target);
     await assertTargetEmpty(target);
 
-    const report = await run(source, target, { allowLocalTarget: true, dryRun: false, force: false });
+    const report = await run(
+      source,
+      target,
+      { allowLocalTarget: true, dryRun: false, force: false },
+      { excludedSourceProfileIds: "" }
+    );
     assert.equal(report.committed, true);
 
     const targetTotalRows = await sumTransferRows(target);
@@ -237,6 +250,8 @@ describe("data transfer test-user exclusion integration", { skip: integrationUrl
     assert.deepEqual(report.excludedSourceProfileIds, TEST_PROFILE_IDS.split(","));
     assert.ok(report.excludedRows.length > 0);
     assert.ok(report.excludedRowCounts.some((entry) => entry.table === "opportunities" && entry.excluded > 0));
+    assert.ok(report.recordFieldStateSummary.excludedCount > 0);
+    assert.ok(report.recordFieldStateSummary.keptCount > 0);
 
     const afterCounts = await countTransferTables(target);
     assert.deepEqual([...afterCounts.entries()], [...beforeCounts.entries()]);
@@ -276,6 +291,39 @@ describe("data transfer test-user exclusion integration", { skip: integrationUrl
       report.summary.find((entry) => entry.table === "opportunities")!.rows,
       targetOpportunities.length
     );
+
+    const [{ rows: sourceOrgFieldState }, { rows: targetOrgFieldState }] = await Promise.all([
+      source.query<{ id: string }>(
+        `select rfs.id
+         from public.record_field_state rfs
+         join public.record_type_registry rtr on rtr.id = rfs.record_type_id
+         where rtr.table_name = 'organizations'`
+      ),
+      target.query<{ id: string }>(
+        `select rfs.id
+         from public.record_field_state rfs
+         join public.record_type_registry rtr on rtr.id = rfs.record_type_id
+         where rtr.table_name = 'organizations'`
+      )
+    ]);
+    assert.equal(targetOrgFieldState.length, sourceOrgFieldState.length);
+
+    const [{ rows: sourceOppFieldState }, { rows: targetOppFieldState }] = await Promise.all([
+      source.query<{ id: string }>(
+        `select rfs.id
+         from public.record_field_state rfs
+         join public.record_type_registry rtr on rtr.id = rfs.record_type_id
+         where rtr.table_name = 'opportunities'`
+      ),
+      target.query<{ id: string }>(
+        `select rfs.id
+         from public.record_field_state rfs
+         join public.record_type_registry rtr on rtr.id = rfs.record_type_id
+         where rtr.table_name = 'opportunities'`
+      )
+    ]);
+    assert.ok(targetOppFieldState.length < sourceOppFieldState.length);
+    assert.equal(report.recordFieldStateSummary.excludedCount, sourceOppFieldState.length - targetOppFieldState.length);
   });
 
   it("transaction rollback stays empty after induced failure with exclusions enabled", async () => {

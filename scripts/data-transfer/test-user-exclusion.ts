@@ -1,3 +1,7 @@
+import {
+  POLYMORPHIC_RECORD_REFERENCE_TABLES,
+  POLYMORPHIC_REFERENCE_COLUMN_PAIRS
+} from "./insert-plan.js";
 import { normalizeRelationName } from "./schema.js";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,7 +50,23 @@ export interface ExcludedRowDetail {
   id: string;
   reason: string;
   table: string;
+  referencedRecordId?: string;
+  referencedTable?: string;
   testProfileId?: string;
+}
+
+export interface PolymorphicReferenceConflict {
+  id: string;
+  message: string;
+  referencedRecordId: string;
+  referencedTable: string;
+  table: string;
+}
+
+export interface RecordFieldStateTransferSummary {
+  excluded: ExcludedRowDetail[];
+  excludedCount: number;
+  keptCount: number;
 }
 
 export interface ResearchConflict {
@@ -102,12 +122,14 @@ function addExclusion(
   table: string,
   id: string,
   reason: string,
-  testProfileId?: string
+  testProfileId?: string,
+  referencedTable?: string,
+  referencedRecordId?: string
 ): void {
   if (!excludedByTable.has(table)) excludedByTable.set(table, new Set());
   if (excludedByTable.get(table)!.has(id)) return;
   excludedByTable.get(table)!.add(id);
-  excludedDetails.push({ id, reason, table, testProfileId });
+  excludedDetails.push({ id, reason, table, testProfileId, referencedTable, referencedRecordId });
 }
 
 function isExcluded(excludedByTable: Map<string, Set<string>>, table: string, id: string | undefined): boolean {
@@ -180,16 +202,37 @@ function isDirectTestWorkflowRow(
   return rowReferencesExcludedProfile(row, seedExclusionProfileColumns(table, foreignKeys), excludedProfileIds);
 }
 
-function recordReference(
+function recordReferenceFromColumns(
   row: Record<string, unknown>,
+  typeColumn: string,
+  idColumn: string,
   recordTypeIdToTableName: Map<string, string>
 ): { recordId: string; tableName: string } | undefined {
-  const recordTypeId = row.record_type_id;
-  const recordId = row.record_id;
+  const recordTypeId = row[typeColumn];
+  const recordId = row[idColumn];
   if (typeof recordTypeId !== "string" || typeof recordId !== "string") return undefined;
   const tableName = recordTypeIdToTableName.get(recordTypeId);
   if (!tableName) return undefined;
   return { recordId, tableName };
+}
+
+function recordReferencesFromRow(
+  row: Record<string, unknown>,
+  recordTypeIdToTableName: Map<string, string>
+): Array<{ recordId: string; tableName: string }> {
+  const references: Array<{ recordId: string; tableName: string }> = [];
+  for (const [typeColumn, idColumn] of POLYMORPHIC_REFERENCE_COLUMN_PAIRS) {
+    const reference = recordReferenceFromColumns(row, typeColumn, idColumn, recordTypeIdToTableName);
+    if (reference) references.push(reference);
+  }
+  return references;
+}
+
+function recordReference(
+  row: Record<string, unknown>,
+  recordTypeIdToTableName: Map<string, string>
+): { recordId: string; tableName: string } | undefined {
+  return recordReferenceFromColumns(row, "record_type_id", "record_id", recordTypeIdToTableName);
 }
 
 function wouldLoseRealResearchGap(
@@ -289,21 +332,25 @@ export function buildTestUserExclusionPlan(
       }
     }
 
-    for (const table of ["audit_log", "import_row_links", "source_links"] as const) {
+    for (const table of POLYMORPHIC_RECORD_REFERENCE_TABLES) {
       for (const row of rowsByTable.get(table) ?? []) {
         const id = rowId(row);
         if (!id || isExcluded(excludedByTable, table, id)) continue;
-        const reference = recordReference(row, recordTypeIdToTableName);
-        if (!reference || !TEST_USER_WORKFLOW_TABLES.has(reference.tableName)) continue;
-        if (isExcluded(excludedByTable, reference.tableName, reference.recordId)) {
+
+        for (const reference of recordReferencesFromRow(row, recordTypeIdToTableName)) {
+          if (!isExcluded(excludedByTable, reference.tableName, reference.recordId)) continue;
           addExclusion(
             excludedByTable,
             excludedDetails,
             table,
             id,
-            `references excluded ${reference.tableName} ${reference.recordId}`
+            `references excluded ${reference.tableName} ${reference.recordId}`,
+            undefined,
+            reference.tableName,
+            reference.recordId
           );
           changed = true;
+          break;
         }
       }
     }
@@ -407,6 +454,143 @@ export function sanitizeExcludedProfileReferences(
   }
 }
 
+export function summarizeRecordFieldStateTransfer(
+  rawRowCount: number,
+  keptRowCount: number,
+  excludedDetails: ExcludedRowDetail[]
+): RecordFieldStateTransferSummary {
+  const excluded = excludedDetails.filter((detail) => detail.table === "record_field_state");
+  return {
+    excluded,
+    excludedCount: rawRowCount - keptRowCount,
+    keptCount: keptRowCount
+  };
+}
+
+function transferredIdsByTable(
+  plans: Map<string, { rows: Record<string, unknown>[] }>
+): Map<string, Set<string>> {
+  const idsByTable = new Map<string, Set<string>>();
+  for (const [table, plan] of plans) {
+    const ids = new Set<string>();
+    for (const row of plan.rows) {
+      const id = rowId(row);
+      if (id) ids.add(id);
+    }
+    idsByTable.set(table, ids);
+  }
+  return idsByTable;
+}
+
+function sourceIdsByTable(rowsByTable: Map<string, Record<string, unknown>[]>): Map<string, Set<string>> {
+  const idsByTable = new Map<string, Set<string>>();
+  for (const [table, rows] of rowsByTable) {
+    const ids = new Set<string>();
+    for (const row of rows) {
+      const id = rowId(row);
+      if (id) ids.add(id);
+    }
+    idsByTable.set(table, ids);
+  }
+  return idsByTable;
+}
+
+export function validatePolymorphicRecordReferences(input: {
+  excludedByTable: Map<string, Set<string>>;
+  plans: Map<string, { rows: Record<string, unknown>[] }>;
+  rawRowsByTable: Map<string, Record<string, unknown>[]>;
+  recordTypeIdToTableName: Map<string, string>;
+  transferTableSet: Set<string>;
+}): PolymorphicReferenceConflict[] {
+  const { excludedByTable, plans, rawRowsByTable, recordTypeIdToTableName, transferTableSet } = input;
+  const transferredIds = transferredIdsByTable(plans);
+  const sourceIds = sourceIdsByTable(rawRowsByTable);
+  const conflicts: PolymorphicReferenceConflict[] = [];
+
+  for (const table of POLYMORPHIC_RECORD_REFERENCE_TABLES) {
+    if (!transferTableSet.has(table)) continue;
+    for (const row of plans.get(table)?.rows ?? []) {
+      const id = rowId(row);
+      if (!id) continue;
+
+      for (const reference of recordReferencesFromRow(row, recordTypeIdToTableName)) {
+        if (!transferTableSet.has(reference.tableName)) continue;
+
+        if (isExcluded(excludedByTable, reference.tableName, reference.recordId)) {
+          conflicts.push({
+            id,
+            message:
+              `${table}.${id} still references excluded ${reference.tableName} ${reference.recordId}; ` +
+              "polymorphic reference exclusion did not run correctly",
+            referencedRecordId: reference.recordId,
+            referencedTable: reference.tableName,
+            table
+          });
+          continue;
+        }
+
+        if (transferredIds.get(reference.tableName)?.has(reference.recordId)) continue;
+
+        const existedInSource = sourceIds.get(reference.tableName)?.has(reference.recordId) ?? false;
+        if (existedInSource) {
+          conflicts.push({
+            id,
+            message:
+              `${table}.${id} references ${reference.tableName} ${reference.recordId} which was not excluded ` +
+              "but is missing from the transfer set",
+            referencedRecordId: reference.recordId,
+            referencedTable: reference.tableName,
+            table
+          });
+        } else {
+          conflicts.push({
+            id,
+            message:
+              `${table}.${id} references unknown ${reference.tableName} ${reference.recordId} ` +
+              "that does not exist in the source database",
+            referencedRecordId: reference.recordId,
+            referencedTable: reference.tableName,
+            table
+          });
+        }
+      }
+    }
+  }
+
+  return conflicts;
+}
+
+export function formatPolymorphicReferenceConflictError(conflicts: PolymorphicReferenceConflict[]): string {
+  const preview = conflicts
+    .slice(0, 20)
+    .map(
+      (conflict) =>
+        `  ${conflict.table}.${conflict.id} -> ${conflict.referencedTable}.${conflict.referencedRecordId}: ${conflict.message}`
+    )
+    .join("\n");
+  return (
+    `Refusing to transfer ${conflicts.length} row(s) with invalid generic record references:\n${preview}\n` +
+    "Resolve these references in the source database or adjust exclusions before re-running."
+  );
+}
+
+export function formatRecordFieldStateTransferReport(summary: RecordFieldStateTransferSummary): string {
+  const lines = [
+    `  kept: ${summary.keptCount}`,
+    `  excluded: ${summary.excludedCount}`
+  ];
+  if (summary.excluded.length === 0) return lines.join("\n");
+
+  lines.push("  excluded rows:");
+  for (const detail of summary.excluded) {
+    const target = detail.referencedTable && detail.referencedRecordId
+      ? ` -> ${detail.referencedTable}.${detail.referencedRecordId}`
+      : "";
+    lines.push(`    ${detail.id}${target} — ${detail.reason}`);
+  }
+  return lines.join("\n");
+}
+
 export function formatResearchConflictError(conflicts: ResearchConflict[]): string {
   const preview = conflicts
     .slice(0, 20)
@@ -431,7 +615,11 @@ export function formatExcludedRowsReport(details: ExcludedRowDetail[]): string {
     lines.push(`  ${table}:`);
     for (const detail of byTable.get(table)!) {
       const profileNote = detail.testProfileId ? ` [test profile ${detail.testProfileId}]` : "";
-      lines.push(`    ${detail.id} — ${detail.reason}${profileNote}`);
+      const referenceNote =
+        detail.referencedTable && detail.referencedRecordId
+          ? ` -> ${detail.referencedTable}.${detail.referencedRecordId}`
+          : "";
+      lines.push(`    ${detail.id}${referenceNote} — ${detail.reason}${profileNote}`);
     }
   }
   return lines.join("\n");
