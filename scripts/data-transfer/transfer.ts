@@ -42,19 +42,24 @@
 import { Client } from "pg";
 
 import {
+  deferredForeignKeyKey,
+  planTransferInsertOrder,
+  type DeferredForeignKey
+} from "./insert-plan.js";
+import {
   listInsertableColumns,
+  listJsonColumnTypes,
   listPublicTables,
   loadPublicForeignKeys,
   quoteIdent,
   tableRowCount,
   type ForeignKeyColumn
 } from "./schema.js";
-import { topologicalSortTables } from "./topo-sort.js";
 
 const EXCLUDED_TABLES = new Set(["profiles", "profile_preferences", "saved_views", "record_type_registry"]);
 const REMAP_REF_TABLES = new Set(["profiles", "record_type_registry"]);
 
-interface Flags {
+export interface Flags {
   allowLocalTarget: boolean;
   dryRun: boolean;
   force: boolean;
@@ -62,14 +67,30 @@ interface Flags {
 
 interface TableTransferPlan {
   columns: string[];
+  jsonColumns: Set<string>;
   rows: Record<string, unknown>[];
 }
 
-interface TransferReport {
+export interface TransferReport {
   committed: boolean;
+  cycleDescription: string;
+  deferredForeignKeys: DeferredForeignKey[];
+  insertStrategy: "topological" | "staged_null_backfill";
   profileMap: Map<string, string>;
   recordTypeMap: Map<string, string>;
   summary: Array<{ rows: number; table: string }>;
+}
+
+export interface RunOptions {
+  /** Test hook: throw after inserting this table to verify rollback. */
+  failAfterTable?: string;
+}
+
+interface DeferredValue {
+  column: string;
+  rowId: string;
+  table: string;
+  value: unknown;
 }
 
 function parseFlags(argv: string[]): Flags {
@@ -86,7 +107,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
-function isLocalPostgresUrl(url: string): boolean {
+export function isLocalPostgresUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
@@ -112,8 +133,6 @@ async function buildProfileMap(source: Client, target: Client): Promise<Map<stri
     }
     const matchByEmail = targetIdByEmail.get(profile.email.toLowerCase());
     if (matchByEmail) map.set(profile.id, matchByEmail);
-    // Otherwise intentionally left unmapped. Only an error later if some
-    // row being transferred actually references this profile id.
   }
   return map;
 }
@@ -157,10 +176,51 @@ function remapColumnsForTable(
     .map((edge) => ({ column: edge.column, refTable: edge.refTable as "profiles" | "record_type_registry" }));
 }
 
+function collectDeferredValues(
+  plans: Map<string, TableTransferPlan>,
+  deferredForeignKeys: DeferredForeignKey[]
+): DeferredValue[] {
+  const deferredKeySet = new Set(
+    deferredForeignKeys.map((entry) => deferredForeignKeyKey(entry.table, entry.column))
+  );
+  const deferredValues: DeferredValue[] = [];
+
+  for (const [table, plan] of plans) {
+    for (const row of plan.rows) {
+      const rowId = row.id;
+      if (typeof rowId !== "string") continue;
+      for (const column of plan.columns) {
+        if (!deferredKeySet.has(deferredForeignKeyKey(table, column))) continue;
+        const value = row[column];
+        if (value === null || value === undefined) continue;
+        deferredValues.push({ column, rowId, table, value });
+        row[column] = null;
+      }
+    }
+  }
+
+  return deferredValues;
+}
+
+function normalizeJsonColumnValue(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "object") return JSON.stringify(value);
+  if (typeof value === "string") {
+    try {
+      JSON.parse(value);
+      return value;
+    } catch {
+      return JSON.stringify(value);
+    }
+  }
+  return JSON.stringify(value);
+}
+
 async function bulkInsert(
   client: Client,
   table: string,
   columns: string[],
+  jsonColumns: Set<string>,
   rows: Record<string, unknown>[],
   chunkSize = 200
 ): Promise<void> {
@@ -172,7 +232,8 @@ async function bulkInsert(
     const values: unknown[] = [];
     const valueRows = chunk.map((row) => {
       const placeholders = columns.map((column) => {
-        values.push(row[column]);
+        const rawValue = row[column];
+        values.push(jsonColumns.has(column) ? normalizeJsonColumnValue(rawValue) : rawValue);
         return `$${values.length}`;
       });
       return `(${placeholders.join(", ")})`;
@@ -185,7 +246,50 @@ async function bulkInsert(
   }
 }
 
-async function run(source: Client, target: Client, flags: Flags): Promise<TransferReport> {
+async function backfillDeferredForeignKeys(client: Client, deferredValues: DeferredValue[]): Promise<void> {
+  for (const entry of deferredValues) {
+    await client.query(
+      `update public.${quoteIdent(entry.table)} set ${quoteIdent(entry.column)} = $1 where id = $2`,
+      [entry.value, entry.rowId]
+    );
+  }
+}
+
+async function validateDeferredForeignKeys(client: Client, deferredValues: DeferredValue[]): Promise<void> {
+  const mismatches: string[] = [];
+  for (const entry of deferredValues) {
+    const { rows } = await client.query<{ value: unknown }>(
+      `select ${quoteIdent(entry.column)} as value from public.${quoteIdent(entry.table)} where id = $1`,
+      [entry.rowId]
+    );
+    const actual = rows[0]?.value ?? null;
+    const expected = entry.value ?? null;
+    if (String(actual) !== String(expected)) {
+      mismatches.push(`${entry.table}.${entry.column} id=${entry.rowId}`);
+    }
+  }
+
+  if (mismatches.length > 0) {
+    throw new Error(
+      `Deferred foreign-key backfill validation failed for ${mismatches.length} row(s): ${mismatches.slice(0, 10).join(", ")}`
+    );
+  }
+}
+
+async function countRowsForTables(client: Client, tables: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  for (const table of tables) {
+    counts.set(table, await tableRowCount(client, table));
+  }
+  return counts;
+}
+
+export async function run(
+  source: Client,
+  target: Client,
+  flags: Flags,
+  options: RunOptions = {}
+): Promise<TransferReport> {
   const [sourceTableList, targetTableList] = await Promise.all([
     listPublicTables(source),
     listPublicTables(target)
@@ -202,37 +306,31 @@ async function run(source: Client, target: Client, flags: Flags): Promise<Transf
   const transferTables = sourceTableList.filter((table) => !EXCLUDED_TABLES.has(table));
   const transferTableSet = new Set(transferTables);
 
-  const edges = await loadPublicForeignKeys(source);
-  const order = topologicalSortTables(
-    transferTables,
-    edges.map((edge) => ({ fromTable: edge.table, toTable: edge.refTable }))
-  );
-
-  const [profileMap, recordTypeMap] = await Promise.all([
+  const foreignKeys = await loadPublicForeignKeys(source);
+  const [profileMap, recordTypeMap, sourceRecordTypes] = await Promise.all([
     buildProfileMap(source, target),
-    buildRecordTypeMap(source, target)
+    buildRecordTypeMap(source, target),
+    source.query<{ id: string; table_name: string }>("select id, table_name from public.record_type_registry")
   ]);
 
-  const nonEmptyTargets: Array<{ count: number; table: string }> = [];
-  for (const table of order) {
-    const count = await tableRowCount(target, table);
-    if (count > 0) nonEmptyTargets.push({ count, table });
+  const recordTypeIdToTableName = new Map<string, string>();
+  for (const row of sourceRecordTypes.rows) {
+    recordTypeIdToTableName.set(row.id, row.table_name);
   }
-  if (nonEmptyTargets.length > 0 && !flags.force) {
-    throw new Error(
-      "Target already has rows in table(s) this transfer would write to. Refusing to risk duplicates.\n" +
-        "Pass --force only after you have verified this is intentional:\n" +
-        nonEmptyTargets.map((entry) => `  ${entry.table}: ${entry.count} existing row(s)`).join("\n")
-    );
+  for (const [sourceId, targetId] of recordTypeMap) {
+    const tableName = recordTypeIdToTableName.get(sourceId);
+    if (tableName) recordTypeIdToTableName.set(targetId, tableName);
   }
 
   const plans = new Map<string, TableTransferPlan>();
   const unresolved: Array<{ column: string; table: string; value: unknown }> = [];
+  const rowsByTable = new Map<string, Record<string, unknown>[]>();
 
-  for (const table of order) {
-    const [sourceColumns, targetColumns] = await Promise.all([
+  for (const table of transferTables) {
+    const [sourceColumns, targetColumns, jsonColumns] = await Promise.all([
       listInsertableColumns(source, table),
-      listInsertableColumns(target, table)
+      listInsertableColumns(target, table),
+      listJsonColumnTypes(source, table)
     ]);
     const missingColumns = sourceColumns.filter((column) => !targetColumns.includes(column));
     if (missingColumns.length > 0) {
@@ -246,7 +344,7 @@ async function run(source: Client, target: Client, flags: Flags): Promise<Transf
       `select ${sourceColumns.map(quoteIdent).join(", ")} from public.${quoteIdent(table)}`
     );
 
-    const remaps = remapColumnsForTable(table, edges, transferTableSet);
+    const remaps = remapColumnsForTable(table, foreignKeys, transferTableSet);
     for (const row of rows) {
       for (const remap of remaps) {
         const value = row[remap.column];
@@ -261,7 +359,8 @@ async function run(source: Client, target: Client, flags: Flags): Promise<Transf
       }
     }
 
-    plans.set(table, { columns: sourceColumns, rows });
+    plans.set(table, { columns: sourceColumns, jsonColumns, rows });
+    rowsByTable.set(table, rows);
   }
 
   if (unresolved.length > 0) {
@@ -278,30 +377,93 @@ async function run(source: Client, target: Client, flags: Flags): Promise<Transf
     );
   }
 
-  const summary = order.map((table) => ({ rows: plans.get(table)!.rows.length, table }));
+  const insertPlanReport = planTransferInsertOrder(
+    transferTables,
+    foreignKeys,
+    rowsByTable,
+    recordTypeIdToTableName
+  );
+  const { deferredForeignKeys, insertOrder } = insertPlanReport.plan;
+
+  const nonEmptyTargets: Array<{ count: number; table: string }> = [];
+  for (const table of insertOrder) {
+    const count = await tableRowCount(target, table);
+    if (count > 0) nonEmptyTargets.push({ count, table });
+  }
+  if (nonEmptyTargets.length > 0 && !flags.force) {
+    throw new Error(
+      "Target already has rows in table(s) this transfer would write to. Refusing to risk duplicates.\n" +
+        "Pass --force only after you have verified this is intentional:\n" +
+        nonEmptyTargets.map((entry) => `  ${entry.table}: ${entry.count} existing row(s)`).join("\n")
+    );
+  }
+
+  const deferredValues = collectDeferredValues(plans, deferredForeignKeys);
+  const summary = insertOrder.map((table) => ({ rows: plans.get(table)!.rows.length, table }));
 
   if (flags.dryRun) {
-    return { committed: false, profileMap, recordTypeMap, summary };
+    return {
+      committed: false,
+      cycleDescription: insertPlanReport.cycleDescription,
+      deferredForeignKeys,
+      insertStrategy: insertPlanReport.strategy,
+      profileMap,
+      recordTypeMap,
+      summary
+    };
   }
 
   await target.query("BEGIN");
   try {
-    for (const table of order) {
+    for (const table of insertOrder) {
       const plan = plans.get(table)!;
-      await bulkInsert(target, table, plan.columns, plan.rows);
+      try {
+        await bulkInsert(target, table, plan.columns, plan.jsonColumns, plan.rows);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Insert failed for table "${table}": ${message}`, { cause: error });
+      }
+      if (options.failAfterTable === table) {
+        throw new Error(`Induced transfer failure after inserting ${table}.`);
+      }
     }
+
+    await backfillDeferredForeignKeys(target, deferredValues);
+    await validateDeferredForeignKeys(target, deferredValues);
+
     await target.query("COMMIT");
   } catch (error) {
     await target.query("ROLLBACK");
     throw error;
   }
 
-  return { committed: true, profileMap, recordTypeMap, summary };
+  return {
+    committed: true,
+    cycleDescription: insertPlanReport.cycleDescription,
+    deferredForeignKeys,
+    insertStrategy: insertPlanReport.strategy,
+    profileMap,
+    recordTypeMap,
+    summary
+  };
+}
+
+export async function countTransferTables(client: Client): Promise<Map<string, number>> {
+  const tables = (await listPublicTables(client)).filter((table) => !EXCLUDED_TABLES.has(table));
+  return countRowsForTables(client, tables);
 }
 
 function printReport(report: TransferReport, flags: Flags): void {
   console.log(`\n${flags.dryRun ? "DRY RUN - nothing was written" : "TRANSFER COMMITTED"}\n`);
-  console.log("Profile id remap (source -> target):");
+  console.log(`Insert strategy: ${report.insertStrategy}`);
+  console.log(`Foreign-key cycle handling: ${report.cycleDescription}`);
+  if (report.deferredForeignKeys.length > 0) {
+    console.log("Deferred foreign keys (inserted null, then backfilled):");
+    for (const entry of report.deferredForeignKeys) {
+      console.log(`  ${entry.table}.${entry.column} -> ${entry.refTable}`);
+    }
+  }
+  console.log("\nProfile id remap (source -> target):");
   for (const [sourceId, targetId] of report.profileMap) {
     console.log(`  ${sourceId} -> ${targetId}${sourceId === targetId ? "  (same id reused)" : ""}`);
   }
@@ -348,7 +510,10 @@ async function main() {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(`\nFAILED: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+const entryPath = process.argv[1] ? new URL(`file://${process.argv[1]}`).href : "";
+if (import.meta.url === entryPath) {
+  main().catch((error: unknown) => {
+    console.error(`\nFAILED: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  });
+}
