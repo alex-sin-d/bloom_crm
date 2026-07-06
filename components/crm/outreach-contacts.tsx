@@ -32,6 +32,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { Json } from "@/lib/supabase/database.types";
 import type { TaskRow } from "@/lib/crm/types";
 import { formatDate, formatDateTime } from "@/lib/crm/format";
+import { formatCrmDateTimeLocalInput } from "@/lib/crm/timezone";
 import { useCallback, useState, useTransition } from "react";
 import Link from "next/link";
 
@@ -564,14 +565,13 @@ export function LogContactForm({
   const [phoneOutcome, setPhoneOutcome] = useState<"no_answer" | "voicemail" | "spoke">("no_answer");
   const [contactRoleId, setContactRoleId] = useState(initialContactRoleId ?? "");
   const [notes, setNotes] = useState("");
-  const [activityAt, setActivityAt] = useState(
-    () => new Date().toISOString().slice(0, 16)
-  );
+  const [activityAt, setActivityAt] = useState(() => formatCrmDateTimeLocalInput());
   const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
     setError(null);
     startTransition(async () => {
       const result = await logContactAction({
@@ -581,7 +581,7 @@ export function LogContactForm({
         direction,
         method,
         phoneOutcome: method === "phone" ? phoneOutcome : undefined,
-        activityAt: new Date(activityAt).toISOString(),
+        activityAt,
         notes: notes || null
       });
       if ("error" in result) {
@@ -682,10 +682,11 @@ export function LogContactForm({
 
       <div className="flex gap-2">
         <button
-          className="rounded-control bg-brand-forest px-4 py-1.5 text-sm font-semibold text-white"
+          className="rounded-control bg-brand-forest px-4 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isPending}
           type="submit"
         >
-          Log contact
+          {isPending ? "Logging..." : "Log contact"}
         </button>
         {onClose ? (
           <button

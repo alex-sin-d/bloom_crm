@@ -2,6 +2,12 @@ import Link from "next/link";
 
 import { StatusBadge } from "@/components/crm/status-badge";
 import {
+  formatCrmLongDate,
+  formatCrmTime,
+  getCrmTodayString,
+  getCrmYesterdayString
+} from "@/lib/crm/timezone";
+import {
   getActivityCategoryLabel,
   groupTimelineEventsByDate,
   type ActivityTimelineEvent,
@@ -305,25 +311,15 @@ function groupEventsByDay(events: ActivityTimelineEvent[]) {
 }
 
 function dayLabel(date: string) {
-  const today = new Date();
-  const todayKey = today.toISOString().slice(0, 10);
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const yesterdayKey = yesterday.toISOString().slice(0, 10);
+  const todayKey = getCrmTodayString();
+  const yesterdayKey = getCrmYesterdayString();
   if (date === todayKey) return "Today";
   if (date === yesterdayKey) return "Yesterday";
-  return new Intl.DateTimeFormat("en-CA", {
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  }).format(new Date(`${date}T00:00:00`));
+  return formatCrmLongDate(date);
 }
 
 function formatEventTime(value: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(new Date(value));
+  return formatCrmTime(value);
 }
 
 function activityHref(filters: ActivityTimelineFilters, cursor?: string | null) {

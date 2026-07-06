@@ -1,30 +1,11 @@
 import type { CrmEnums } from "./types.js";
-
-function isWeekend(date: Date) {
-  const day = date.getDay();
-  return day === 0 || day === 6;
-}
-
-function addBusinessDaysLocal(from: Date, n: number) {
-  if (n < 0) {
-    throw new RangeError("addBusinessDaysLocal: n must be non-negative");
-  }
-
-  const result = new Date(from);
-  let remaining = n;
-  while (remaining > 0) {
-    result.setDate(result.getDate() + 1);
-    if (!isWeekend(result)) remaining--;
-  }
-  return result;
-}
-
-function toLocalDateStringLocal(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+import {
+  addCrmBusinessDays,
+  addCrmCalendarDays,
+  getCrmTodayString,
+  parseCrmLocalDateTimeToUtc,
+  toCrmDateString
+} from "@/lib/crm/format";
 
 export const TASK_VIEW_VALUES = [
   "my",
@@ -84,7 +65,7 @@ export type TaskSummaryCounts = {
 };
 
 export function getLocalTodayString(now = new Date()) {
-  return toLocalDateStringLocal(now);
+  return getCrmTodayString(now);
 }
 
 export function isOpenTaskStatus(status: CrmEnums["task_status"]) {
@@ -257,19 +238,14 @@ export function getQuickRescheduleDate(
   from = new Date()
 ) {
   if (choice === "tomorrow") {
-    const tomorrow = new Date(from);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return toLocalDateStringLocal(tomorrow);
+    return toCrmDateString(addCrmCalendarDays(from, 1));
   }
 
-  return toLocalDateStringLocal(addBusinessDaysLocal(from, choice === "3bd" ? 3 : 5));
+  return toCrmDateString(addCrmBusinessDays(from, choice === "3bd" ? 3 : 5));
 }
 
 export function buildDueAtIso(dueDate: string, dueTime: string | null | undefined) {
   const trimmedTime = dueTime?.trim();
   if (!trimmedTime) return null;
-
-  const dueAt = new Date(`${dueDate}T${trimmedTime}:00`);
-  if (Number.isNaN(dueAt.getTime())) return null;
-  return dueAt.toISOString();
+  return parseCrmLocalDateTimeToUtc(dueDate, trimmedTime);
 }

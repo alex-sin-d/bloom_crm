@@ -91,30 +91,272 @@ export function formatConfidenceLabel(value: string | null | undefined) {
   return value ? (confidenceLabels[value] ?? formatEnumLabel(value)) : "Unknown confidence";
 }
 
-export function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
+export const CRM_TIME_ZONE = "America/Regina";
 
-  return new Intl.DateTimeFormat("en-CA", {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(`${value}T00:00:00`));
+const CRM_LOCALE = "en-CA";
+
+type CrmDateParts = {
+  day: number;
+  hour: number;
+  minute: number;
+  month: number;
+  year: number;
+};
+
+const crmDateFormatter = new Intl.DateTimeFormat(CRM_LOCALE, {
+  day: "numeric",
+  month: "short",
+  timeZone: CRM_TIME_ZONE,
+  year: "numeric"
+});
+
+const crmTimeFormatter = new Intl.DateTimeFormat(CRM_LOCALE, {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: CRM_TIME_ZONE
+});
+
+const crmDateTimeFormatter = new Intl.DateTimeFormat(CRM_LOCALE, {
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  month: "short",
+  timeZone: CRM_TIME_ZONE,
+  year: "numeric"
+});
+
+const crmLongDateFormatter = new Intl.DateTimeFormat(CRM_LOCALE, {
+  day: "numeric",
+  month: "long",
+  timeZone: CRM_TIME_ZONE,
+  year: "numeric"
+});
+
+const crmCalendarDateFormatter = new Intl.DateTimeFormat(CRM_LOCALE, {
+  day: "2-digit",
+  month: "2-digit",
+  timeZone: CRM_TIME_ZONE,
+  year: "numeric"
+});
+
+const crmWeekdayFormatter = new Intl.DateTimeFormat(CRM_LOCALE, {
+  timeZone: CRM_TIME_ZONE,
+  weekday: "short"
+});
+
+function parseDateOnly(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!match) return null;
+  return {
+    day: Number(match[3]),
+    month: Number(match[2]),
+    year: Number(match[1])
+  };
 }
 
-export function formatDateTime(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
+function readDateTimeParts(parts: Intl.DateTimeFormatPart[]): CrmDateParts {
+  const read = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+
+  return {
+    day: read("day"),
+    hour: read("hour"),
+    minute: read("minute"),
+    month: read("month"),
+    year: read("year")
+  };
+}
+
+function getCrmDateTimeParts(date: Date): CrmDateParts {
+  return readDateTimeParts(
+    new Intl.DateTimeFormat(CRM_LOCALE, {
+      day: "2-digit",
+      hour: "2-digit",
+      hour12: false,
+      minute: "2-digit",
+      month: "2-digit",
+      timeZone: CRM_TIME_ZONE,
+      year: "numeric"
+    }).formatToParts(date)
+  );
+}
+
+function dateFromDateOnlyParts(parts: Pick<CrmDateParts, "day" | "month" | "year">) {
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0));
+}
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function toInstant(value: string | Date) {
+  return value instanceof Date ? value : new Date(value);
+}
+
+export function formatCrmCalendarDate(date: Date) {
+  const parts = readDateTimeParts(crmCalendarDateFormatter.formatToParts(date));
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+}
+
+export function getCrmTodayString(now = new Date()) {
+  return formatCrmCalendarDate(now);
+}
+
+export function getCrmYesterdayString(now = new Date()) {
+  const today = parseDateOnly(getCrmTodayString(now));
+  if (!today) return getCrmTodayString(now);
+  return formatCrmCalendarDate(dateFromDateOnlyParts({
+    day: today.day - 1,
+    month: today.month,
+    year: today.year
+  }));
+}
+
+export function getCrmDateKey(value: string | Date) {
+  return formatCrmCalendarDate(toInstant(value));
+}
+
+export function getCrmWeekday(date: Date) {
+  return crmWeekdayFormatter.format(date);
+}
+
+export function isCrmWeekend(date: Date) {
+  const weekday = getCrmWeekday(date);
+  return weekday.startsWith("Sat") || weekday.startsWith("Sun");
+}
+
+export function formatCrmDate(value: string | null | undefined) {
+  if (!value) return "Not set";
+
+  const dateOnly = parseDateOnly(value);
+  if (dateOnly) {
+    return crmDateFormatter.format(dateFromDateOnlyParts(dateOnly));
   }
 
-  return new Intl.DateTimeFormat("en-CA", {
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not set";
+  return crmDateFormatter.format(parsed);
+}
+
+export function formatCrmTime(value: string | Date | null | undefined) {
+  if (!value) return "Not set";
+  const parsed = toInstant(value);
+  if (Number.isNaN(parsed.getTime())) return "Not set";
+  return crmTimeFormatter.format(parsed);
+}
+
+export function formatCrmDateTime(value: string | Date | null | undefined) {
+  if (!value) return "Not set";
+  const parsed = toInstant(value);
+  if (Number.isNaN(parsed.getTime())) return "Not set";
+  return crmDateTimeFormatter.format(parsed);
+}
+
+export function formatCrmLongDate(value: string | null | undefined) {
+  if (!value) return "Not set";
+
+  const dateOnly = parseDateOnly(value);
+  if (dateOnly) {
+    return crmLongDateFormatter.format(dateFromDateOnlyParts(dateOnly));
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not set";
+  return crmLongDateFormatter.format(parsed);
+}
+
+export function formatCrmDateTimeLocalInput(value: Date = new Date()) {
+  const parts = getCrmDateTimeParts(value);
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}`;
+}
+
+export function parseCrmLocalDateTimeToUtc(date: string, time: string) {
+  const dateParts = parseDateOnly(date);
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(time.trim());
+  if (!dateParts || !timeMatch) return null;
+
+  const target = {
+    day: dateParts.day,
+    hour: Number(timeMatch[1]),
+    minute: Number(timeMatch[2]),
+    month: dateParts.month,
+    year: dateParts.year
+  };
+
+  let utcMs = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute, 0);
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const actual = getCrmDateTimeParts(new Date(utcMs));
+    const targetMs = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute, 0);
+    const actualMs = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, 0);
+    const diffMs = targetMs - actualMs;
+    if (diffMs === 0) {
+      return new Date(utcMs).toISOString();
+    }
+    utcMs += diffMs;
+  }
+
+  return null;
+}
+
+export function parseCrmDateTimeLocalInputToUtc(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes("T")) {
+    const [date, time] = trimmed.split("T");
+    if (date && time) {
+      return parseCrmLocalDateTimeToUtc(date, time.slice(0, 5));
+    }
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
+export function toCrmDateString(date: Date) {
+  return formatCrmCalendarDate(date);
+}
+
+export function formatCrmTimeInput(value: string | Date | null | undefined) {
+  if (!value) return "";
+  const parsed = toInstant(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const parts = getCrmDateTimeParts(parsed);
+  return `${pad(parts.hour)}:${pad(parts.minute)}`;
+}
+
+export function addCrmCalendarDays(from: Date, days: number) {
+  const parts = parseDateOnly(formatCrmCalendarDate(from));
+  if (!parts) return new Date(from.getTime());
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days, 12, 0, 0));
+}
+
+export function addCrmBusinessDays(from: Date, count: number) {
+  if (count < 0) {
+    throw new RangeError("addCrmBusinessDays: count must be non-negative");
+  }
+
+  let cursor = new Date(from.getTime());
+  let remaining = count;
+
+  while (remaining > 0) {
+    cursor = addCrmCalendarDays(cursor, 1);
+    if (!isCrmWeekend(cursor)) {
+      remaining -= 1;
+    }
+  }
+
+  return cursor;
+}
+
+export function formatDate(value: string | null | undefined) {
+  return formatCrmDate(value);
+}
+
+export function formatDateTime(value: string | Date | null | undefined) {
+  return formatCrmDateTime(value);
 }
 
 export function compactList(values: Array<string | null | undefined>, fallback = "None") {

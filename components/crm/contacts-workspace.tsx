@@ -26,6 +26,7 @@ import {
   getContactCategoryLabel,
   getContactMethodLabel
 } from "@/lib/crm/contact-logic";
+import { formatDate, formatDateTime } from "@/lib/crm/format";
 import type {
   ContactDetail,
   ContactDirectoryItem,
@@ -512,8 +513,8 @@ function DirectoryTable({
                     {row.email || row.phone ? <StatusBadge>Reachable</StatusBadge> : <StatusBadge tone="warning">Missing info</StatusBadge>}
                   </div>
                 </td>
-                <td className="px-4 py-3">{row.nextFollowUpDueDate ? formatDateLabel(row.nextFollowUpDueDate) : "No open follow-up"}</td>
-                <td className="px-4 py-3">{row.lastContactedAt ? formatDateTimeLabel(row.lastContactedAt) : "Never contacted"}</td>
+                <td className="px-4 py-3">{row.nextFollowUpDueDate ? formatDate(row.nextFollowUpDueDate) : "No open follow-up"}</td>
+                <td className="px-4 py-3">{row.lastContactedAt ? formatDateTime(row.lastContactedAt) : "Never contacted"}</td>
                 <td className="px-4 py-3">
                   <ContactEditButton contact={directoryRowToEditableContact(row)} />
                 </td>
@@ -778,7 +779,7 @@ export function ContactDetailWorkspace({
             </p>
             <h1 className="mt-1 text-3xl font-semibold text-text-heading">{detail.displayName}</h1>
             <p className="mt-2 text-sm text-text-muted">
-              {detail.sourceLabel} - Updated {formatDateTimeLabel(detail.updatedAt)}
+              {detail.sourceLabel} - Updated {formatDateTime(detail.updatedAt)}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -794,7 +795,7 @@ export function ContactDetailWorkspace({
         <dl className="mt-5 grid gap-4 md:grid-cols-3">
           <SummaryItem label="Email"><CopyButton label="email" value={detail.email} /></SummaryItem>
           <SummaryItem label="Phone"><CopyButton label="phone" value={detail.phone} /></SummaryItem>
-          <SummaryItem label="Next follow-up">{detail.nextFollowUp?.dueDate ? formatDateLabel(detail.nextFollowUp.dueDate) : "No open follow-up"}</SummaryItem>
+          <SummaryItem label="Next follow-up">{detail.nextFollowUp?.dueDate ? formatDate(detail.nextFollowUp.dueDate) : "No open follow-up"}</SummaryItem>
         </dl>
       </section>
 
@@ -1260,7 +1261,7 @@ function TasksSection({ tasks }: { tasks: ContactDetail["openTasks"] }) {
             <Link className="block px-4 py-3 hover:bg-surface-subtle" href={task.href} key={task.id}>
               <p className="font-medium text-text-heading">{task.title}</p>
               <p className="mt-1 text-sm text-text-muted">
-                {task.dueDate ? formatDateLabel(task.dueDate) : "No due date"} - {task.owner ?? "Unassigned"}
+                {task.dueDate ? formatDate(task.dueDate) : "No due date"} - {task.owner ?? "Unassigned"}
               </p>
             </Link>
           ))}
@@ -1336,21 +1337,3 @@ const OPERATIONAL_STATUS_VALUES: CrmEnums["contact_operational_or_influence_stat
   "senior_escalation",
   "unknown"
 ];
-
-function formatDateLabel(value: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(`${value}T00:00:00`));
-}
-
-function formatDateTimeLabel(value: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
-}

@@ -9,6 +9,7 @@ import {
   getActivationBlocker
 } from "@/lib/crm/add-to-pipeline";
 import { deriveOutreachRuleResult } from "@/lib/crm/outreach-rules";
+import { parseCrmDateTimeLocalInputToUtc } from "@/lib/crm/timezone";
 import { mergeCollapseState } from "@/lib/crm/collapse-preferences";
 import {
   findContactMethodDuplicate,
@@ -664,14 +665,42 @@ export async function logContactAction(input: LogContactInput): Promise<LogConta
   const profile = await requireActiveOwner();
   const supabase = await createServerSupabaseClient();
 
+  const activityAt =
+    parseCrmDateTimeLocalInputToUtc(input.activityAt) ?? input.activityAt;
+  const loggedAt = new Date(activityAt);
+  if (Number.isNaN(loggedAt.getTime())) {
+    return { error: "Could not parse the contact date and time." };
+  }
+
   const ruleResult = deriveOutreachRuleResult(
     {
       direction: input.direction,
       method: input.method,
       phoneOutcome: input.phoneOutcome
     },
-    new Date(input.activityAt)
+    loggedAt
   );
+
+  const duplicateWindowStart = new Date(loggedAt.getTime() - 120_000).toISOString();
+  const duplicateWindowEnd = new Date(loggedAt.getTime() + 120_000).toISOString();
+  const { data: recentDuplicate } = await supabase
+    .from("activities")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("user_id", profile.id)
+    .eq("activity_type", ruleResult.activity.activityType)
+    .eq("direction", ruleResult.activity.direction)
+    .gte("activity_at", duplicateWindowStart)
+    .lte("activity_at", duplicateWindowEnd)
+    .is("archived_at", null)
+    .order("activity_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (recentDuplicate) {
+    revalidateOutreachPaths(input.organizationId);
+    return { success: true, activityId: recentDuplicate.id };
+  }
 
   // First outreach auto-activates the org into Active Opportunities. Idempotent:
   // reuses the existing opportunity if one is already active.
@@ -684,7 +713,7 @@ export async function logContactAction(input: LogContactInput): Promise<LogConta
       user_id: profile.id,
       activity_type: ruleResult.activity.activityType,
       direction: ruleResult.activity.direction,
-      activity_at: input.activityAt,
+      activity_at: activityAt,
       organization_id: input.organizationId,
       opportunity_id: opportunityId,
       contact_role_id: input.contactRoleId,
@@ -709,7 +738,7 @@ export async function logContactAction(input: LogContactInput): Promise<LogConta
     .from("organization_outreach")
     .update({
       outreach_status: ruleResult.newStatus,
-      status_changed_at: input.activityAt,
+      status_changed_at: activityAt,
       status_changed_by: profile.id,
       updated_by: profile.id
     })

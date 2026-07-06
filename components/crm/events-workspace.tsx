@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/crm/status-badge";
 import { eventDirectoryHref } from "@/lib/crm/event-logic";
 import type { EventContactSummary, EventDetail, EventDirectoryData, EventDirectoryFilters, EventFormOptions } from "@/lib/crm/event-queries";
 import { formatDate, formatEnumLabel } from "@/lib/crm/format";
+import { getCrmTodayString } from "@/lib/crm/timezone";
 import type { CrmEnums, ProfileSummary } from "@/lib/crm/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -948,7 +949,7 @@ function EventTasksSection({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => getCrmTodayString(), []);
   return (
     <section className="rounded-card border border-border bg-surface shadow-soft">
       <SectionHeader title="Tasks" />

@@ -9,7 +9,9 @@
     "noEmit": false,
     "outDir": ".frontend-test-dist",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/lib/crm/format": ["lib/crm/format.ts"],
+      "@/lib/crm/timezone": ["lib/crm/timezone.ts"]
     },
     "rootDir": ".",
     "types": ["node"]
@@ -33,6 +35,7 @@
     "lib/crm/outreach-rules.ts",
     "lib/crm/query-utils.ts",
     "lib/crm/task-logic.ts",
+    "lib/crm/timezone.ts",
     "lib/crm/types.ts",
     "lib/supabase/database.types.ts"
   ]

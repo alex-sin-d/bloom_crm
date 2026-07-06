@@ -2,6 +2,7 @@
 
 import { setUserStatusAction, updateUserRoleAction } from "@/app/(app)/admin-tools/users/actions";
 import type { AppUserSummary } from "@/lib/crm/admin-mutations";
+import { formatCrmDateTime } from "@/lib/crm/timezone";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -88,7 +89,7 @@ export function UserManagementTable({
                 </td>
                 <td className="px-4 py-3 capitalize">{user.status}</td>
                 <td className="px-4 py-3 text-text-muted">
-                  {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleString() : "Never"}
+                  {user.lastActiveAt ? formatCrmDateTime(user.lastActiveAt) : "Never"}
                 </td>
                 <td className="px-4 py-3 text-right">
                   {user.id === currentProfileId ? (

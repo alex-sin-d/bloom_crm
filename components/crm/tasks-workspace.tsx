@@ -7,6 +7,7 @@ import {
   rescheduleTaskAction
 } from "@/app/(app)/tasks/actions";
 import { formatDate, formatDateTime } from "@/lib/crm/format";
+import { formatCrmTime, formatCrmTimeInput } from "@/lib/crm/timezone";
 import { getQuickRescheduleDate } from "@/lib/crm/task-logic";
 import type {
   TaskContactOption,
@@ -109,8 +110,7 @@ function ownerLabel(task: TaskListItem) {
 }
 
 function dueLabel(task: TaskListItem, today: string) {
-  const dueTime = timeFromDueAt(task.dueAt);
-  const timeLabel = dueTime ? ` at ${dueTime}` : "";
+  const timeLabel = task.dueAt ? ` at ${formatCrmTime(task.dueAt)}` : "";
   if (!task.dueDate) return "No due date";
   if (task.dueDate === today) return `Due today${timeLabel}`;
   if (task.dueDate < today) return `Overdue since ${formatDate(task.dueDate)}${timeLabel}`;
@@ -122,10 +122,7 @@ function contactTypeLabel(contact: TaskContactOption) {
 }
 
 function timeFromDueAt(dueAt: string | null) {
-  if (!dueAt) return "";
-  const date = new Date(dueAt);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return formatCrmTimeInput(dueAt);
 }
 
 function FilterPanel({ data }: { data: TaskWorkspaceData }) {

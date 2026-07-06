@@ -13,6 +13,7 @@ import type {
   VenueRow
 } from "./types.js";
 import type { Database, Json } from "../supabase/database.types.js";
+import { formatCrmDate, getCrmDateKey } from "@/lib/crm/format";
 
 const UNIVERSITY_OUTREACH_TYPES: ReadonlySet<CrmEnums["organization_type"]> = new Set([
   "university",
@@ -381,8 +382,8 @@ export function filterTimelineEvents(
     .filter((event) => !filters.personId || event.relatedPersonIds.includes(filters.personId))
     .filter((event) => !filters.schoolDivisionId || event.relatedOrganizationIds.includes(filters.schoolDivisionId))
     .filter((event) => !filters.schoolId || event.relatedOrganizationIds.includes(filters.schoolId))
-    .filter((event) => !filters.dateFrom || event.occurredAt.slice(0, 10) >= filters.dateFrom)
-    .filter((event) => !filters.dateTo || event.occurredAt.slice(0, 10) <= filters.dateTo)
+    .filter((event) => !filters.dateFrom || getCrmDateKey(event.occurredAt) >= filters.dateFrom)
+    .filter((event) => !filters.dateTo || getCrmDateKey(event.occurredAt) <= filters.dateTo)
     .filter((event) => !query || event.searchText.includes(query))
     .filter((event) => isAfterActivityCursor(event, cursor))
     .sort(compareTimelineEvents);
@@ -400,7 +401,7 @@ export function paginateTimelineEvents(events: ActivityTimelineEvent[], limit: n
 export function groupTimelineEventsByDate(events: ActivityTimelineEvent[]) {
   const groups = new Map<string, ActivityTimelineEvent[]>();
   for (const event of events) {
-    const key = event.occurredAt.slice(0, 10);
+    const key = getCrmDateKey(event.occurredAt);
     groups.set(key, [...(groups.get(key) ?? []), event]);
   }
   return Array.from(groups.entries()).map(([date, groupedEvents]) => ({
@@ -460,7 +461,7 @@ export function buildTaskFallbackEvent(task: TaskRow, maps: TimelineMaps): Activ
     descriptionParts: [title, task.title],
     detailParts: [
       detail("Task", task.title),
-      detail("Due date", task.due_date ? formatDate(task.due_date) : null),
+      detail("Due date", task.due_date ? formatCrmDate(task.due_date) : null),
       detail("Status", formatEnumLabel(task.status))
     ],
     href: taskHref(task),
@@ -550,7 +551,7 @@ export function buildImportEvent(batch: TimelineImportBatch, maps: TimelineMaps)
     detailParts: [
       detail("Import mode", formatEnumLabel(batch.import_mode)),
       detail("Status", formatEnumLabel(batch.status)),
-      detail("Completed", batch.completed_at ? formatDate(batch.completed_at.slice(0, 10)) : null)
+      detail("Completed", batch.completed_at ? formatCrmDate(batch.completed_at.slice(0, 10)) : null)
     ],
     id: `import_batches:${batch.id}`,
     occurredAt,
@@ -821,7 +822,7 @@ function buildTaskAuditEvent(audit: AuditLogRow, maps: TimelineMaps): ActivityTi
       detail("Previous", displayAuditValue(fieldName, stringValue(audit.before_value, fieldName), maps)),
       detail("New", displayAuditValue(fieldName, stringValue(audit.after_value, fieldName), maps)),
       detail("Completed", task.completed_at),
-      detail("Due date", task.due_date ? formatDate(task.due_date) : null)
+      detail("Due date", task.due_date ? formatCrmDate(task.due_date) : null)
     ],
     href: taskHref(task),
     id: `audit_log:${audit.id}`,
@@ -1137,15 +1138,6 @@ function formatEnumLabel(value: string | null | undefined) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "Not set";
-  return new Intl.DateTimeFormat("en-CA", {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(`${value}T00:00:00`));
 }
 
 function formatPipelineStageLabel(value: string | null | undefined) {

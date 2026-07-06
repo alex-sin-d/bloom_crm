@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "frontend:test": "tsc -p tsconfig.frontend-tests.json && node --test .frontend-test-dist/tests/frontend/*.test.js",
+    "frontend:test": "tsc -p tsconfig.frontend-tests.json && node --import ./tests/frontend/register.mjs --test .frontend-test-dist/tests/frontend/*.test.js",
     "integration:test": "tsc -p tsconfig.integration-tests.json && node --import ./tests/integration/register.mjs --test .integration-test-dist/tests/integration/*.test.js",
     "importer:build": "tsc -p tsconfig.importer.json",
     "importer:test": "tsc -p tsconfig.importer.json && node --test .importer-dist/scripts/importer/__tests__/*.test.js",

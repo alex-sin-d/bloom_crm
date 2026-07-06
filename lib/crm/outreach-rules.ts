@@ -1,29 +1,5 @@
 import type { CrmEnums } from "@/lib/crm/types.js";
-
-// ── Business-day helpers (local copy for server-action bundling) ────────────
-// The canonical implementations live in business-days.ts (tested directly).
-
-function isWeekend(date: Date): boolean {
-  const day = date.getDay();
-  return day === 0 || day === 6;
-}
-
-function addBusinessDaysLocal(from: Date, n: number): Date {
-  const result = new Date(from);
-  let remaining = n;
-  while (remaining > 0) {
-    result.setDate(result.getDate() + 1);
-    if (!isWeekend(result)) remaining--;
-  }
-  return result;
-}
-
-function toLocalDateStringLocal(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import { addCrmBusinessDays, toCrmDateString } from "@/lib/crm/format";
 
 export type OutreachMethodInput = "email" | "phone";
 export type PhoneOutcome = "no_answer" | "voicemail" | "spoke";
@@ -68,7 +44,7 @@ export function deriveOutreachRuleResult(
         activity: { activityType: "email_sent", direction: "outbound", outcome: null },
         newStatus: "awaiting_reply",
         reminder: {
-          dueDateString: toLocalDateStringLocal(addBusinessDaysLocal(from, 3)),
+          dueDateString: toCrmDateString(addCrmBusinessDays(from, 3)),
           title: "Send follow-up email"
         }
       };
@@ -86,7 +62,7 @@ export function deriveOutreachRuleResult(
         activity: { activityType: "call_attempted", direction: "outbound", outcome: "No answer" },
         newStatus: "follow_up_due",
         reminder: {
-          dueDateString: toLocalDateStringLocal(addBusinessDaysLocal(from, 1)),
+          dueDateString: toCrmDateString(addCrmBusinessDays(from, 1)),
           title: "Follow up after missed call"
         }
       };
@@ -101,7 +77,7 @@ export function deriveOutreachRuleResult(
         },
         newStatus: "follow_up_due",
         reminder: {
-          dueDateString: toLocalDateStringLocal(addBusinessDaysLocal(from, 1)),
+          dueDateString: toCrmDateString(addCrmBusinessDays(from, 1)),
           title: "Follow up after voicemail"
         }
       };
@@ -142,7 +118,7 @@ export function deriveNextReminderAfterCompletion(
 ): ReminderSpec | null {
   if (completedStep === 1) {
     return {
-      dueDateString: toLocalDateStringLocal(addBusinessDaysLocal(completedAt, 5)),
+      dueDateString: toCrmDateString(addCrmBusinessDays(completedAt, 5)),
       title: "Send second follow-up email"
     };
   }
