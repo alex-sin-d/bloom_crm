@@ -6,6 +6,8 @@ const eslintConfig = [
   ...nextTypescript,
   {
     ignores: [
+      ".admin-dist/**",
+      ".data-transfer-dist/**",
       ".frontend-test-dist/**",
       ".importer-dist/**",
       ".integration-test-dist/**",

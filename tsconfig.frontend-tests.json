@@ -16,6 +16,7 @@
   },
   "include": [
     "tests/frontend/**/*.ts",
+    "lib/auth/roles.ts",
     "lib/config/feature-visibility.ts",
     "lib/config/navigation.ts",
     "lib/crm/add-to-pipeline.ts",

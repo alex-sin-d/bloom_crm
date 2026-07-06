@@ -18,7 +18,7 @@ export async function createServerSupabaseClient() {
             cookieStore.set(name, value, options);
           });
         } catch {
-          // Server Components cannot always write cookies. Middleware can be added when auth is wired.
+          // Server Components cannot always write cookies; proxy.ts refreshes sessions.
         }
       }
     }
