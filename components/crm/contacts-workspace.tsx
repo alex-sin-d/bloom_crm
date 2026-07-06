@@ -10,12 +10,14 @@ import {
   editContactRoleAction,
   editDepartmentContactAction,
   editPersonContactAction,
-  saveContactMethodAction,
-  type AddContactRoleInput,
-  type ContactActionResult,
-  type CreateDepartmentContactInput,
-  type CreatePersonContactInput
+  saveContactMethodAction
 } from "@/app/(app)/contacts/actions";
+import type {
+  AddContactRoleInput,
+  ContactActionResult,
+  CreateDepartmentContactInput,
+  CreatePersonContactInput
+} from "@/lib/crm/contact-mutations";
 import { ActivitySummarySection } from "@/components/crm/activity-timeline";
 import { ContactEditButton, type EditableContact } from "@/components/crm/contact-edit-modal";
 import { Pagination } from "@/components/crm/pagination";

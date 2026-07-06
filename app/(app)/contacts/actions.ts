@@ -13,24 +13,9 @@ import {
   restoreContactMethod,
   restoreContactRole,
   saveContactMethod,
-  updateContactStatus,
-  type AddContactRoleInput,
-  type ArchiveContactMethodInput,
-  type ArchiveContactRoleInput,
-  type AssignContactOutreachInput,
-  type ContactActionResult,
-  type CreateDepartmentContactInput,
-  type CreatePersonContactInput,
-  type EditContactRoleInput,
-  type EditDepartmentContactInput,
-  type EditPersonContactInput,
-  type RestoreContactMethodInput,
-  type RestoreContactRoleInput,
-  type SaveContactMethodInput,
-  type UpdateContactStatusInput
+  updateContactStatus
 } from "@/lib/crm/contact-mutations";
-
-export type {
+import type {
   AddContactRoleInput,
   ArchiveContactMethodInput,
   ArchiveContactRoleInput,
@@ -45,7 +30,7 @@ export type {
   RestoreContactRoleInput,
   SaveContactMethodInput,
   UpdateContactStatusInput
-};
+} from "@/lib/crm/contact-mutations";
 
 export async function createPersonContactAction(input: CreatePersonContactInput): Promise<ContactActionResult> {
   return createPersonContact(input);
