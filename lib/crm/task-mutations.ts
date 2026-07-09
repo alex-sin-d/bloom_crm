@@ -32,10 +32,41 @@ export type CreateManualTaskInput = {
   venueId?: string | null;
 };
 
-export type AssignTaskInput = {
-  assignedUserId: string | null;
-  taskId: string;
+type SchemaOutput<T> = T extends { parse(input: unknown): infer Output } ? Output : never;
+
+function isInputRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function parseRequiredString(value: unknown, label: string) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${label} is required.`);
+  }
+  return value;
+}
+
+function parseNullableString(value: unknown, label: string) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string.`);
+  }
+  return value;
+}
+
+export const assignTaskInputSchema = {
+  parse(input: unknown) {
+    if (!isInputRecord(input)) {
+      throw new Error("Task assignment input is invalid.");
+    }
+
+    return {
+      assignedUserId: parseNullableString(input.assignedUserId, "Assigned user"),
+      taskId: parseRequiredString(input.taskId, "Task")
+    };
+  }
 };
+
+export type AssignTaskInput = SchemaOutput<typeof assignTaskInputSchema>;
 
 export type RescheduleTaskInput = {
   dueDate: string;

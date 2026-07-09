@@ -2133,39 +2133,138 @@ export type Database = {
       university_outreach_profiles: {
         Row: {
           campus_count: number | null
+          ceremony_pattern: string | null
+          ceremony_venue: string | null
           country: string | null
           created_at: string
           created_by: string | null
+          domain: string | null
+          graduate_scale: string | null
+          has_competition: boolean | null
+          information_still_missing: string | null
           institution_type: string | null
+          manual_review_metadata: Json
           organization_id: string
+          outreach_priority: string | null
+          previous_names: Json
+          primary_address: string | null
+          primary_source_url: string | null
           priority_level: string | null
+          priority_target_first_action: string | null
+          priority_target_rationale: string | null
+          priority_target_tier: string | null
+          priority_target_why: string | null
+          raw_source_data: Json
+          recommended_first_contact: string | null
+          recommended_next_action: string | null
+          relevant_campuses: Json
+          research_notes: string | null
+          review_flags: Json
+          source_institution_id: string | null
+          source_system: string | null
+          source_urls: Json
           student_population: number | null
           updated_at: string
           updated_by: string | null
+          vendor_finding: Json
+          vendor_name: string | null
+          vendor_status: string | null
+          venue_authority_status: string | null
+          venue_contact_reason: string | null
+          venue_contact_recommended: boolean | null
+          venue_source_url: string | null
+          verification_status: string | null
+          working_notes: string | null
         }
         Insert: {
           campus_count?: number | null
+          ceremony_pattern?: string | null
+          ceremony_venue?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
+          domain?: string | null
+          graduate_scale?: string | null
+          has_competition?: boolean | null
+          information_still_missing?: string | null
           institution_type?: string | null
+          manual_review_metadata?: Json
           organization_id: string
+          outreach_priority?: string | null
+          previous_names?: Json
+          primary_address?: string | null
+          primary_source_url?: string | null
           priority_level?: string | null
+          priority_target_first_action?: string | null
+          priority_target_rationale?: string | null
+          priority_target_tier?: string | null
+          priority_target_why?: string | null
+          raw_source_data?: Json
+          recommended_first_contact?: string | null
+          recommended_next_action?: string | null
+          relevant_campuses?: Json
+          research_notes?: string | null
+          review_flags?: Json
+          source_institution_id?: string | null
+          source_system?: string | null
+          source_urls?: Json
           student_population?: number | null
           updated_at?: string
           updated_by?: string | null
+          vendor_finding?: Json
+          vendor_name?: string | null
+          vendor_status?: string | null
+          venue_authority_status?: string | null
+          venue_contact_reason?: string | null
+          venue_contact_recommended?: boolean | null
+          venue_source_url?: string | null
+          verification_status?: string | null
+          working_notes?: string | null
         }
         Update: {
           campus_count?: number | null
+          ceremony_pattern?: string | null
+          ceremony_venue?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
+          domain?: string | null
+          graduate_scale?: string | null
+          has_competition?: boolean | null
+          information_still_missing?: string | null
           institution_type?: string | null
+          manual_review_metadata?: Json
           organization_id?: string
+          outreach_priority?: string | null
+          previous_names?: Json
+          primary_address?: string | null
+          primary_source_url?: string | null
           priority_level?: string | null
+          priority_target_first_action?: string | null
+          priority_target_rationale?: string | null
+          priority_target_tier?: string | null
+          priority_target_why?: string | null
+          raw_source_data?: Json
+          recommended_first_contact?: string | null
+          recommended_next_action?: string | null
+          relevant_campuses?: Json
+          research_notes?: string | null
+          review_flags?: Json
+          source_institution_id?: string | null
+          source_system?: string | null
+          source_urls?: Json
           student_population?: number | null
           updated_at?: string
           updated_by?: string | null
+          vendor_finding?: Json
+          vendor_name?: string | null
+          vendor_status?: string | null
+          venue_authority_status?: string | null
+          venue_contact_reason?: string | null
+          venue_contact_recommended?: boolean | null
+          venue_source_url?: string | null
+          verification_status?: string | null
+          working_notes?: string | null
         }
         Relationships: [
           {

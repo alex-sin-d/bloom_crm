@@ -1,0 +1,839 @@
+{
+  "_meta": {
+    "dataset": "alberta_institutions",
+    "generated": "2026-07-05",
+    "generated_for": "Bloom Boys - University Outreach CRM",
+    "pass": "Continuation pass 1 (rebuild + normalization)",
+    "record_count": 25,
+    "schema_notes": {
+      "removed_fields": [
+        "venue_controls_retail (removed per instruction: external venue does not establish vendor authority)"
+      ],
+      "added_fields": {
+        "competition": "boolean. TRUE = a known incumbent on-site ceremony flower/keepsake vendor (e.g. The Commencement Group / Convocation Flowers) is CONFIRMED to operate at this institution. FALSE = no incumbent on-site vendor identified in this pass. IMPORTANT: FALSE means 'not found this pass', NOT 'confirmed open market'. See review_flags. In this pass no Alberta incumbent was confirmed, so all values are FALSE-pending-verification. The Commencement Group is confirmed active in Western Canada (U of Regina, U of T), so U of A and U of C especially require incumbent verification."
+      },
+      "vendor_status_enum": [
+        "named_vendor_confirmed",
+        "unnamed_vendor_confirmed",
+        "flower_sales_confirmed_vendor_unknown",
+        "no_public_vendor_found",
+        "institution_confirmed_no_vendor",
+        "vendor_status_unknown",
+        "flowers_restricted",
+        "flowers_prohibited_in_specific_area"
+      ],
+      "verification_status_enum": [
+        "fully_verified_this_pass",
+        "identity_reconciled_details_unverified",
+        "unverified_pending_research"
+      ],
+      "venue_authority_fields_location": "Moved to alberta_notes.json per instruction (cleaner CRM). Fields: venue_contact_recommended, venue_contact_reason, venue_authority_status, venue_source_url."
+    },
+    "honesty_note": "Only NAIT and University of Alberta were researched to full contact depth this pass. All 25 identity records are reconciled to Alberta.ca's publicly funded institution list. The remaining 23 require a continuation pass for contacts and vendor status. Fields not verified this pass are null with a review_flag rather than guessed."
+  },
+  "institutions": [
+    {
+      "institution_id": "ab-uofa",
+      "official_name": "University of Alberta",
+      "previous_names": [],
+      "institution_type": "Comprehensive academic and research university (CARU)",
+      "status": "active",
+      "city": "Edmonton",
+      "province": "AB",
+      "website": "https://www.ualberta.ca",
+      "domain": "ualberta.ca",
+      "main_phone": "780-492-3111",
+      "main_email": "convocation@ualberta.ca",
+      "primary_address": "116 St & 85 Ave, Edmonton, AB T6G 2R3",
+      "relevant_campuses": [
+        "North Campus (Edmonton)",
+        "Augustana Campus (Camrose) - holds its own ceremony",
+        "Campus Saint-Jean (Edmonton)"
+      ],
+      "ceremony_venue": "Northern Alberta Jubilee Auditorium, 11455 87 Ave, Edmonton (external, Province of Alberta-operated venue)",
+      "ceremony_pattern": "Three convocation periods/year: Spring (June, multi-day), Fall (November), Winter (March). Spring 2026 ran June 4, 9-12, 15-17. Multiple sessions per day, split by faculty.",
+      "graduate_scale": "Largest in Alberta; 340,000+ living alumni. Per-year graduate count not verified this pass.",
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "high",
+      "primary_source_url": "https://www.ualberta.ca/en/registrar/graduation-convocation/ceremony-details.html",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "Ceremony asks guests to refrain from signs/flags/banners; flowers NOT listed as prohibited (contrast with U of Calgary). Confirm whether an on-site flower vendor operates at the Jubilee ceremonies.",
+        "Verify whether The Commencement Group (active at U of Regina) operates here."
+      ]
+    },
+    {
+      "institution_id": "ab-uofc",
+      "official_name": "University of Calgary",
+      "previous_names": [],
+      "institution_type": "Comprehensive academic and research university (CARU)",
+      "status": "active",
+      "city": "Calgary",
+      "province": "AB",
+      "website": "https://www.ucalgary.ca",
+      "domain": "ucalgary.ca",
+      "main_phone": "403-220-5110",
+      "main_email": "convinfo@ucalgary.ca",
+      "primary_address": "2500 University Dr NW, Calgary, AB T2N 1N4",
+      "relevant_campuses": [
+        "Main Campus (Calgary)"
+      ],
+      "ceremony_venue": "Jack Simpson Gymnasium (ceremony); regalia pickup at the Olympic Oval, ice level. On-campus, university-controlled.",
+      "ceremony_pattern": "Spring (June) and Fall (Nov 9-10, 2026) convocation, plus a February conferral. Multiple ceremonies per period.",
+      "graduate_scale": "Very large. Exact count not verified this pass.",
+      "vendor_status": "flowers_prohibited_in_specific_area",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.ucalgary.ca/graduation/convocation/graduating-students",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "PRECISE FINDING (verified): flowers and corsages are on the list of items graduands may NOT carry WITH THEM during the ceremony at Jack Simpson Gymnasium. This is NOT a venue-wide ban and does NOT restrict guests. A reception follows the formal ceremony. OPPORTUNITY: sell to families/guests for post-ceremony gifting - do NOT write this off as keepsakes-only.",
+        "Official photographer is Artona (photos, not flowers). Check separately whether any flower vendor serves guests/families.",
+        "Verified convocation contact: convinfo@ucalgary.ca."
+      ]
+    },
+    {
+      "institution_id": "ab-uleth",
+      "official_name": "University of Lethbridge",
+      "previous_names": [],
+      "institution_type": "Comprehensive academic and research university (CARU)",
+      "status": "active",
+      "city": "Lethbridge",
+      "province": "AB",
+      "website": "https://www.ulethbridge.ca",
+      "domain": "ulethbridge.ca",
+      "main_phone": "403-329-2000",
+      "main_email": null,
+      "primary_address": "4401 University Dr W, Lethbridge, AB T1K 3M4",
+      "relevant_campuses": [
+        "Lethbridge (main)",
+        "Calgary Campus"
+      ],
+      "ceremony_venue": "1st Choice Savings Centre / Co-op Centre for Sport and Wellness (on-campus), Lethbridge",
+      "ceremony_pattern": "Spring (May 28-29 2026, 4 ceremonies) + Fall; Feb completers invited to Spring.",
+      "graduate_scale": null,
+      "vendor_status": "flower_sales_confirmed_vendor_unknown",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.ulethbridge.ca/convocation/available-services-convocation-day",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: fresh flowers sold in the foyer by an UNNAMED vendor (not the Commencement Group), presented to grads after the ceremony (can't be carried on the platform). Alumni Association sells frames/rings. Convocation Office phone 403-329-2156 verified; a 'Convocation Coordinator' role handles the ceremony; convocation email redacted in source (do not guess)."
+      ]
+    },
+    {
+      "institution_id": "ab-athabasca",
+      "official_name": "Athabasca University",
+      "previous_names": [],
+      "institution_type": "Comprehensive academic and research university (CARU) - open/online",
+      "status": "active",
+      "city": "Athabasca",
+      "province": "AB",
+      "website": "https://www.athabascau.ca",
+      "domain": "athabascau.ca",
+      "main_phone": "1-800-788-9041",
+      "main_email": "grad-app@athabascau.ca",
+      "primary_address": "1 University Dr, Athabasca, AB T9S 3A3",
+      "relevant_campuses": [
+        "Athabasca (admin)",
+        "Edmonton (St. Albert Trail office)",
+        "Calgary office"
+      ],
+      "ceremony_venue": "Athabasca Regional Multiplex, Athabasca, AB (+ celebrations on AU campus)",
+      "ceremony_pattern": "Two ceremonies annually in Athabasca town (June 11-12 2026); ~800+ names/ceremony, many in absentia (online/distance university).",
+      "graduate_scale": null,
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "Woodland + Wildflower Weddings (Athabasca-based florist)",
+      "competition": true,
+      "outreach_priority": "low",
+      "primary_source_url": "https://www.athabascau.ca/convocation/memorabilia.html",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "INCUMBENT (local): Athabasca-based florist Woodland + Wildflower Weddings sells pre-order + limited on-site AU bouquets and grad bears. Jostens rings; GradPhotos.ca photos; AU Store merch. REMOTE: ceremony is in Athabasca town (~1.5hr N of Edmonton) = low feasibility for Bloom Boys, and a local vendor is already in place."
+      ]
+    },
+    {
+      "institution_id": "ab-macewan",
+      "official_name": "MacEwan University",
+      "previous_names": [
+        "Grant MacEwan Community College",
+        "Grant MacEwan College",
+        "Grant MacEwan University"
+      ],
+      "institution_type": "Undergraduate university",
+      "status": "active",
+      "city": "Edmonton",
+      "province": "AB",
+      "website": "https://www.macewan.ca",
+      "domain": "macewan.ca",
+      "main_phone": "780-497-5000",
+      "main_email": "convocation@macewan.ca",
+      "primary_address": "10700 104 Ave NW, Edmonton, AB T5J 4S2",
+      "relevant_campuses": [
+        "City Centre Campus (Edmonton)"
+      ],
+      "ceremony_venue": "Winspear Centre, 4 Sir Winston Churchill Square, Edmonton",
+      "ceremony_pattern": "Spring (June) + Fall convocation; ~6 ceremonies over 3-4 days at the Winspear Centre. Spring 2026 June 16-19.",
+      "graduate_scale": "~2,400 credentials/yr (Spring 2025 figure).",
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "The Commencement Group (branded 'Convocation Flowers' on regalia portal)",
+      "competition": true,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.macewan.ca/apply-enrol/graduation-convocation/convocation/ceremony/",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "INCUMBENT CONFIRMED: flower vendor listed as 'Convocation Flowers' on the Gaspard regalia portal AND thecommencementgroup.com/macewanu exists - corroborates that Convocation Flowers and The Commencement Group are one operation. Regalia = Gaspard. Not whitespace."
+      ]
+    },
+    {
+      "institution_id": "ab-mru",
+      "official_name": "Mount Royal University",
+      "previous_names": [
+        "Mount Royal College"
+      ],
+      "institution_type": "Undergraduate university",
+      "status": "active",
+      "city": "Calgary",
+      "province": "AB",
+      "website": "https://www.mtroyal.ca",
+      "domain": "mtroyal.ca",
+      "main_phone": "403-440-6111",
+      "main_email": "convocation@mtroyal.ca",
+      "primary_address": "4825 Mount Royal Gate SW, Calgary, AB T3E 6K6",
+      "relevant_campuses": [
+        "Calgary (main)"
+      ],
+      "ceremony_venue": "On-campus, Triple Gym (Recreation/Kinesiology building), Calgary",
+      "ceremony_pattern": "Spring (June 10-12 2026, ceremonies 10am & 2pm) + Fall convocation. Guest cap 4/graduand.",
+      "graduate_scale": null,
+      "vendor_status": "flower_sales_confirmed_vendor_unknown",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "high",
+      "primary_source_url": "https://www.mtroyal.ca/AcademicSupport/ResourcesServices/ConvocationGraduation/FamilyFriends/index.htm",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: MRU runs a multi-vendor 'concourse' at convocation (flowers + Cougars Campus Store + cafe). Flowers are sold and pre-orderable but NO exclusive vendor is named - a non-exclusive concourse is easier to join than displacing an incumbent. Check the 'pre-order flowers' link destination to see if it's the Commencement Group.",
+        "Also hosts a Nursing Pinning Ceremony (June 10 at the Bella) - adjacency for the separate opportunities file."
+      ]
+    },
+    {
+      "institution_id": "ab-nait",
+      "official_name": "Northern Alberta Institute of Technology (NAIT)",
+      "previous_names": [],
+      "institution_type": "Polytechnic",
+      "status": "active",
+      "city": "Edmonton",
+      "province": "AB",
+      "website": "https://www.nait.ca",
+      "domain": "nait.ca",
+      "main_phone": "780-471-6248",
+      "main_email": "events@nait.ca",
+      "primary_address": "11762 106 St NW, Edmonton, AB T5G 2R1",
+      "relevant_campuses": [
+        "Main Campus (Edmonton)",
+        "Patricia Campus",
+        "Souch Campus"
+      ],
+      "ceremony_venue": "Edmonton Convention Centre (9797 Jasper Ave NW, Edmonton) - external venue. Spring Convocation June 22-25, 2026. Photo sessions in Salon 5, two levels below Hall D.",
+      "ceremony_pattern": "Spring Convocation over multiple days (June 22-25, 2026) at the Edmonton Convention Centre, with tickets and livestream.",
+      "graduate_scale": "Large polytechnic (one of Alberta's biggest). Exact count not verified this pass.",
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "The Commencement Group",
+      "competition": true,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.nait.ca/nait/student-life/graduation-convocation/graduation-photos-gifts",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "INCUMBENT CONFIRMED (not whitespace): NAIT's official gifts page directs grads to preorder flowers from The Commencement Group (thecommencementgroup.com/nait). Jostens does grad rings; Smart Photography does photos. Bloom Boys angle = complementary products the Commencement Group does not cover, or approach at contract renewal - do not expect an easy flower slot.",
+        "Venue = Edmonton Convention Centre, which may have its own retail/loading rules (operational follow-up)."
+      ]
+    },
+    {
+      "institution_id": "ab-sait",
+      "official_name": "Southern Alberta Institute of Technology (SAIT)",
+      "previous_names": [
+        "SAIT Polytechnic"
+      ],
+      "institution_type": "Polytechnic",
+      "status": "active",
+      "city": "Calgary",
+      "province": "AB",
+      "website": "https://www.sait.ca",
+      "domain": "sait.ca",
+      "main_phone": "403-284-7248",
+      "main_email": null,
+      "primary_address": "1301 16 Ave NW, Calgary, AB T2M 0L4",
+      "relevant_campuses": [
+        "Main Campus (Calgary)"
+      ],
+      "ceremony_venue": "Southern Alberta Jubilee Auditorium, 1415 14 Ave NW, Calgary",
+      "ceremony_pattern": "Three convocations/year; ~5 ceremonies over 3 days (Spring: June 16-18 2026).",
+      "graduate_scale": "Large polytechnic. Not verified this pass.",
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "The Commencement Group",
+      "competition": true,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.sait.ca/student-life/graduation/convocation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "INCUMBENT CONFIRMED: thecommencementgroup.com/sait + 'pre-order your graduation flowers' on the Gaspard portal. Regalia = Gaspard. Jostens rings rep Sean Kelly 403-252-1774. Contact via Office of the Registrar support ticket (saitregistrar.freshdesk.com)."
+      ]
+    },
+    {
+      "institution_id": "ab-rdp",
+      "official_name": "Red Deer Polytechnic",
+      "previous_names": [
+        "Red Deer College"
+      ],
+      "institution_type": "Polytechnic",
+      "status": "active",
+      "city": "Red Deer",
+      "province": "AB",
+      "website": "https://rdpolytech.ca",
+      "domain": "rdpolytech.ca",
+      "main_phone": "403-342-3300",
+      "main_email": null,
+      "primary_address": "100 College Blvd, Red Deer, AB T4N 5H5",
+      "relevant_campuses": [
+        "Red Deer (main)"
+      ],
+      "ceremony_venue": "Gary W. Harris Canada Games Centre (Fas Gas - On The Run Gymnasium), RDP main campus, Red Deer",
+      "ceremony_pattern": "Annual Convocation, one day (June 5, 2026), morning + afternoon ceremonies. ~1,080 grads (2026, largest class).",
+      "graduate_scale": "~1,080 attending grads (2026); ~1,850 eligible (2024).",
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "Stems Flowers & Cafe (alumni-owned local florist)",
+      "competition": true,
+      "outreach_priority": "low",
+      "primary_source_url": "https://rdpolytech.ca/register-attend-convocation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "INCUMBENT (local): Stems Flowers & Cafe, an alumni-owned local florist, sells bouquets in the Convocation Marketplace AND donates a portion to the RDP Alumni Association - it already occupies Bloom Boys' 'local + give-back' positioning, making this a hard displacement. Not the Commencement Group. Photographer Lifetouch. Convocation is a multi-vendor 'Marketplace'."
+      ]
+    },
+    {
+      "institution_id": "ab-nwp",
+      "official_name": "Northwestern Polytechnic",
+      "previous_names": [
+        "Grande Prairie Regional College",
+        "GPRC"
+      ],
+      "institution_type": "Polytechnic",
+      "status": "active",
+      "city": "Grande Prairie",
+      "province": "AB",
+      "website": "https://www.nwpolytech.ca",
+      "domain": "nwpolytech.ca",
+      "main_phone": "780-539-2911",
+      "main_email": null,
+      "primary_address": "10726 106 Ave, Grande Prairie, AB T8V 4C4",
+      "relevant_campuses": [
+        "Grande Prairie (main)",
+        "Fairview Campus"
+      ],
+      "ceremony_venue": "Douglas J. Cardinal Performing Arts Centre (Grande Prairie campus); Fairview Campus holds its own ceremony",
+      "ceremony_pattern": "Grande Prairie: 2 ceremonies over ~2 days (June 10-12 2026), ~300-345 grads. Fairview Campus: separate ceremony (President's Tea after).",
+      "graduate_scale": null,
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "low",
+      "primary_source_url": "https://www.nwpolytech.ca/student-life/convocation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: no flower vendor found (grads can't carry flowers on stage; no vendor named). Not the Commencement Group. TWO campus ceremonies (Grande Prairie + Fairview). REMOTE: Grande Prairie ~4.5hr from Edmonton."
+      ]
+    },
+    {
+      "institution_id": "ab-bvc",
+      "official_name": "Bow Valley College",
+      "previous_names": [],
+      "institution_type": "Comprehensive community college (CCC)",
+      "status": "active",
+      "city": "Calgary",
+      "province": "AB",
+      "website": "https://bowvalleycollege.ca",
+      "domain": "bowvalleycollege.ca",
+      "main_phone": "403-410-1400",
+      "main_email": "grad@bowvalleycollege.ca",
+      "primary_address": "345 6 Ave SE, Calgary, AB T2G 4V1",
+      "relevant_campuses": [
+        "Calgary (main)",
+        "regional campuses (Airdrie, Cochrane, etc.)"
+      ],
+      "ceremony_venue": "Jack Singer Concert Hall, Arts Commons, downtown Calgary",
+      "ceremony_pattern": "Spring (June 17-18 2026) + Fall (Nov); two ceremonies/day.",
+      "graduate_scale": null,
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "high",
+      "primary_source_url": "https://www.bowvalleycollege.ca/student-life/graduation-and-convocation/convocation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: no flower vendor found on convocation pages. BUT venue is Jack Singer Concert Hall at Arts Commons, a managed performing-arts venue that likely controls its own concessions/retail - venue authority is the key question here, not the institution. Photographer = Edge Imaging."
+      ]
+    },
+    {
+      "institution_id": "ab-keyano",
+      "official_name": "Keyano College",
+      "previous_names": [],
+      "institution_type": "Comprehensive community college (CCC)",
+      "status": "active",
+      "city": "Fort McMurray",
+      "province": "AB",
+      "website": "https://www.keyano.ca",
+      "domain": "keyano.ca",
+      "main_phone": "780-791-4800",
+      "main_email": "convocation@keyano.ca",
+      "primary_address": "8115 Franklin Ave, Fort McMurray, AB T9H 2H7",
+      "relevant_campuses": [
+        "Fort McMurray (main)"
+      ],
+      "ceremony_venue": "Keyano College Theatre (on-campus, Clearwater Campus), Fort McMurray",
+      "ceremony_pattern": "60th Annual Convocation over 3 days (June 3-5 2026), multiple ceremonies by program. Nurse Pinning also.",
+      "graduate_scale": null,
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "low",
+      "primary_source_url": "https://www.keyano.ca/student-services/office-of-the-registrar/graduation/convocation/",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: no flower vendor found. On-campus theatre (college controls venue). REMOTE: Fort McMurray ~4.5hr from Edmonton = low feasibility."
+      ]
+    },
+    {
+      "institution_id": "ab-lakeland",
+      "official_name": "Lakeland College",
+      "previous_names": [],
+      "institution_type": "Comprehensive community college (CCC)",
+      "status": "active",
+      "city": "Vermilion",
+      "province": "AB",
+      "website": "https://www.lakelandcollege.ca",
+      "domain": "lakelandcollege.ca",
+      "main_phone": "1-800-661-6490",
+      "main_email": "hello@lakelandcollege.ca",
+      "primary_address": "5707 College Dr, Vermilion, AB T9X 1K5",
+      "relevant_campuses": [
+        "Vermilion (main)",
+        "Lloydminster Campus (AB/SK border) - STRATEGICALLY RELEVANT to Saskatoon base"
+      ],
+      "ceremony_venue": "Lloydminster: Lloyd Gymnasium (campus gym). Vermilion: Vermilion Stadium (procession from curling rink). SEPARATE campus ceremonies.",
+      "ceremony_pattern": "TWO separate campus convocations: Lloydminster (~late May, e.g. Fri May 29 2026) and Vermilion (~early June, e.g. June 5). Each ~2hrs.",
+      "graduate_scale": null,
+      "vendor_status": "flower_sales_confirmed_vendor_unknown",
+      "vendor_name": "Lakeland College Bookstore (in-house)",
+      "competition": false,
+      "outreach_priority": "high",
+      "primary_source_url": "https://lakelandcollege.ca/current-students/convocation/index.html",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "TOP STRATEGIC OPENING: Lloydminster campus runs its OWN convocation (Lloyd Gymnasium) separate from Vermilion, and flowers are sold only in-house via the campus bookstore ('fresh roses, singles/3/6/dozen, while supplies last') - NO professional vendor, NO Commencement Group. Closest AB campus to Saskatoon. Ideal first managed-stand pilot. Named contact: Kyla Graham."
+      ]
+    },
+    {
+      "institution_id": "ab-lethpoly",
+      "official_name": "Lethbridge Polytechnic",
+      "previous_names": [
+        "Lethbridge College",
+        "Lethbridge Community College"
+      ],
+      "institution_type": "Polytechnic",
+      "status": "active",
+      "city": "Lethbridge",
+      "province": "AB",
+      "website": "https://lethpolytech.ca",
+      "domain": "lethpolytech.ca",
+      "main_phone": "403-320-3200",
+      "main_email": "convocation@lethpolytech.ca",
+      "primary_address": "3000 College Dr S, Lethbridge, AB T1K 1L6",
+      "relevant_campuses": [
+        "Lethbridge (main)"
+      ],
+      "ceremony_venue": "Val Matteotti Gymnasium (on-campus), Lethbridge",
+      "ceremony_pattern": "Spring Convocation (Fri May 22 2026), 2 ceremonies (10am + 2pm). ~1,230 grads, ~640 crossing.",
+      "graduate_scale": null,
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "The Commencement Group",
+      "competition": true,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://lethpolytech.ca/convocation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "NAME/DOMAIN CONFIRMED: Lethbridge Polytechnic (formerly Lethbridge College), lethpolytech.ca. INCUMBENT = The Commencement Group (thecommencementgroup.com/lethpolytech). Note contrast: U of Lethbridge (the university) uses an unnamed foyer vendor, NOT the Commencement Group. Photographer Emmerson Reyes + Lifetouch."
+      ]
+    },
+    {
+      "institution_id": "ab-mhc",
+      "official_name": "Medicine Hat College",
+      "previous_names": [],
+      "institution_type": "Comprehensive community college (CCC)",
+      "status": "active",
+      "city": "Medicine Hat",
+      "province": "AB",
+      "website": "https://www.mhc.ab.ca",
+      "domain": "mhc.ab.ca",
+      "main_phone": "403-529-3811",
+      "main_email": "jwilliams@mhc.ab.ca",
+      "primary_address": "299 College Dr SE, Medicine Hat, AB T1A 3Y6",
+      "relevant_campuses": [
+        "Medicine Hat (main)",
+        "Brooks Campus"
+      ],
+      "ceremony_venue": "Co-op Place (arena), Medicine Hat",
+      "ceremony_pattern": "Single Convocation (June 12 2026, 1pm) + a separate Indigenous convocation. ~480 grads (2024, largest).",
+      "graduate_scale": null,
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.mhc.ab.ca/student-life/convocation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: no flower vendor found. BUT venue is Co-op Place (a managed arena) - it may control concessions/retail. Photographer Lifetouch. Domain confirmed mhc.ab.ca. Guest cap removed (arena has space)."
+      ]
+    },
+    {
+      "institution_id": "ab-norquest",
+      "official_name": "NorQuest College",
+      "previous_names": [],
+      "institution_type": "Comprehensive community college (CCC)",
+      "status": "active",
+      "city": "Edmonton",
+      "province": "AB",
+      "website": "https://www.norquest.ca",
+      "domain": "norquest.ca",
+      "main_phone": "780-644-6000",
+      "main_email": "convocation@norquest.ca",
+      "primary_address": "10215 108 St NW, Edmonton, AB T5J 1L6",
+      "relevant_campuses": [
+        "Edmonton (main)",
+        "regional sites (Wetaskiwin, Drayton Valley, etc.)"
+      ],
+      "ceremony_venue": "Edmonton EXPO Centre (recent; was Winspear Centre)",
+      "ceremony_pattern": "Annual Spring convocation at the Edmonton EXPO Centre.",
+      "graduate_scale": null,
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "The Commencement Group",
+      "competition": true,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.norquest.ca/student-resources/convocation/general-information/",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "INCUMBENT CONFIRMED: thecommencementgroup.com/NorQuest. The prior pass's 'whitespace candidate' label was WRONG. Registrar organizes convocation. Venue = Edmonton EXPO Centre (venue may have its own retail rules)."
+      ]
+    },
+    {
+      "institution_id": "ab-nlc",
+      "official_name": "Northern Lakes College",
+      "previous_names": [],
+      "institution_type": "Comprehensive community college (CCC)",
+      "status": "active",
+      "city": "Slave Lake",
+      "province": "AB",
+      "website": "https://www.northernlakescollege.ca",
+      "domain": "northernlakescollege.ca",
+      "main_phone": "1-866-652-3456",
+      "main_email": null,
+      "primary_address": "1201 Main St SE, Slave Lake, AB T0G 2A3",
+      "relevant_campuses": [
+        "Distributed model across many small northern sites"
+      ],
+      "ceremony_venue": "Slave Lake Multi Recreation Centre (arena), Slave Lake",
+      "ceremony_pattern": "Central annual convocation (June 5 2026), ~1,192 grads (record, +38% since 2023). Expanding to TWO ceremonies from 2027. Nurse Pinning also.",
+      "graduate_scale": null,
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.northernlakescollege.ca/about-us/convocation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "CORRECTS EARLIER ASSUMPTION: despite being a distributed-delivery college, NLC holds a LARGE central ceremony (~1,192 grads, growing fast) at the Slave Lake Multi Rec Centre. No flower vendor found = possible opening. Arena venue may control retail. REMOTE: Slave Lake ~2.5hr NW of Edmonton."
+      ]
+    },
+    {
+      "institution_id": "ab-olds",
+      "official_name": "Olds College of Agriculture & Technology",
+      "previous_names": [
+        "Olds College"
+      ],
+      "institution_type": "Comprehensive community college (CCC) / agricultural college",
+      "status": "active",
+      "city": "Olds",
+      "province": "AB",
+      "website": "https://www.oldscollege.ca",
+      "domain": "oldscollege.ca",
+      "main_phone": "403-556-8281",
+      "main_email": "info@oldscollege.ca",
+      "primary_address": "4500 50 St, Olds, AB T4H 1R6",
+      "relevant_campuses": [
+        "Olds (main)"
+      ],
+      "ceremony_venue": "Ralph Klein Centre (on-campus gym), Olds",
+      "ceremony_pattern": "Annual Convocation, typically a Saturday in early June. Parchments mailed (not presented). ~380 grads (2023).",
+      "graduate_scale": null,
+      "vendor_status": "flower_sales_confirmed_vendor_unknown",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://www.oldscollege.ca/news-events/events/convocation/celebrate-convocation-at-olds-college.html",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: an UNNAMED vendor sells convocation flowers in the Ralph Klein Centre foyer (pre-orderable); not the Commencement Group. Same graduand-only flower restriction as U of C (flowers barred from being carried during the ceremony, sold for after). Registrar schedules convocation. Confirm the current foyer vendor and whether it's open to replacement.",
+        "Official name confirmed: Olds College of Agriculture & Technology."
+      ]
+    },
+    {
+      "institution_id": "ab-portage",
+      "official_name": "Portage College",
+      "previous_names": [],
+      "institution_type": "Comprehensive community college (CCC)",
+      "status": "active",
+      "city": "Lac La Biche",
+      "province": "AB",
+      "website": "https://www.portagecollege.ca",
+      "domain": "portagecollege.ca",
+      "main_phone": "1-866-623-5551",
+      "main_email": null,
+      "primary_address": "9531 94 Ave, Lac La Biche, AB T0A 2C0",
+      "relevant_campuses": [
+        "Lac La Biche (main)",
+        "St. Paul, Cold Lake, Bonnyville sites"
+      ],
+      "ceremony_venue": "Portage College Gymnasium, Lac La Biche Campus (all campuses convocate here)",
+      "ceremony_pattern": "First Thursday+Friday in June (e.g. June 5-6), 4 ceremonies over 2 days by program. ~1,000-1,200 grads. Convocation is free ('a gift from the College'). Nurse Pinning also.",
+      "graduate_scale": null,
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "low",
+      "primary_source_url": "https://portagecollege.ca/student-services/convocation/",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: no flower vendor found. Larger than expected (~1,000-1,200 grads, 4 ceremonies). On-campus gym. REMOTE: Lac La Biche NE Alberta. All campuses (Lac La Biche/St Paul/Cold Lake) convocate at Lac La Biche."
+      ]
+    },
+    {
+      "institution_id": "ab-aua",
+      "official_name": "Alberta University of the Arts",
+      "previous_names": [
+        "Alberta College of Art + Design (ACAD)",
+        "Alberta College of Art",
+        "Provincial Institute of Technology and Art (art programs)"
+      ],
+      "institution_type": "Specialized arts university",
+      "status": "active",
+      "city": "Calgary",
+      "province": "AB",
+      "website": "https://www.auarts.ca",
+      "domain": "auarts.ca",
+      "main_phone": "403-284-7600",
+      "main_email": null,
+      "primary_address": "1407 14 Ave NW, Calgary, AB T2N 4R3",
+      "relevant_campuses": [
+        "Calgary (main)"
+      ],
+      "ceremony_venue": "Southern Alberta Jubilee Auditorium, 1415 14 Ave NW, Calgary (next to campus)",
+      "ceremony_pattern": "Single annual Convocation (~late May, e.g. May 26). Grad Show reception follows at Illingworth Kerr Gallery. Small grad class.",
+      "graduate_scale": "Small (specialized art school). Not verified this pass.",
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "low",
+      "primary_source_url": "https://auarts.ca/event/convocation-2025",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "No flower vendor found (possible small opening). Same venue as SAIT (Southern Alberta Jubilee) where the Commencement Group operates - the venue itself may host a vendor. Small volume. Registrar's Office runs convocation; no specific convocation email found."
+      ]
+    },
+    {
+      "institution_id": "ab-ambrose",
+      "official_name": "Ambrose University",
+      "previous_names": [
+        "Alliance University College / Nazarene University College (predecessors)"
+      ],
+      "institution_type": "Independent academic institution (IAI, faith-based)",
+      "status": "active",
+      "city": "Calgary",
+      "province": "AB",
+      "website": "https://ambrose.edu",
+      "domain": "ambrose.edu",
+      "main_phone": "403-410-2000",
+      "main_email": null,
+      "primary_address": "150 Ambrose Cir SW, Calgary, AB T3H 0L5",
+      "relevant_campuses": [
+        "Calgary (main)"
+      ],
+      "ceremony_venue": "First Alliance Church, 12345 40 Street SE, Calgary (off-campus)",
+      "ceremony_pattern": "Single annual Convocation (Monday May 11, 2026, 2 PM). Small (undergrad + seminary + education). ~13,000 total alumni.",
+      "graduate_scale": "Small. Not verified this pass.",
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "low",
+      "primary_source_url": "https://ambrose.edu/academics/graduation-information/graduands",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "No flower vendor found (possible small opening). Ceremony is OFF-CAMPUS at First Alliance Church - the church would control on-site retail. Lion's Store sells grad merch; photos via gradphotos.ca. Registrar runs convocation."
+      ]
+    },
+    {
+      "institution_id": "ab-burman",
+      "official_name": "Burman University",
+      "previous_names": [
+        "Canadian University College",
+        "Canadian Union College"
+      ],
+      "institution_type": "Independent academic institution (IAI, faith-based)",
+      "status": "active",
+      "city": "Lacombe",
+      "province": "AB",
+      "website": "https://www.burmanu.ca",
+      "domain": "burmanu.ca",
+      "main_phone": "403-782-3381",
+      "main_email": "info@burmanu.ca",
+      "primary_address": "6730 University Dr, Lacombe, AB T4L 2E5",
+      "relevant_campuses": [
+        "Lacombe (main)"
+      ],
+      "ceremony_venue": "College Heights SDA Church (on-campus), Lacombe",
+      "ceremony_pattern": "TWICE yearly: late April (e.g. Apr 25-27 2025) and October, tied to the SDA calendar. Commencement on Sunday.",
+      "graduate_scale": "Small (per an unofficial florist source ~200-400/ceremony; not officially confirmed).",
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "low",
+      "primary_source_url": "https://www.burmanu.ca/graduation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: no on-site flower vendor found; families currently use local delivery florists (demand exists) - room for an on-site stand. Church venue (College Heights SDA) would control retail. Unusual April+October schedule. Small SDA community. Registrar runs convocation."
+      ]
+    },
+    {
+      "institution_id": "ab-concordia",
+      "official_name": "Concordia University of Edmonton",
+      "previous_names": [
+        "Concordia University College of Alberta",
+        "Concordia College"
+      ],
+      "institution_type": "Independent academic institution (IAI)",
+      "status": "active",
+      "city": "Edmonton",
+      "province": "AB",
+      "website": "https://www.concordia.ab.ca",
+      "domain": "concordia.ab.ca",
+      "main_phone": "780-479-8481",
+      "main_email": null,
+      "primary_address": "7128 Ada Blvd NW, Edmonton, AB T5B 4E4",
+      "relevant_campuses": [
+        "Edmonton (main)"
+      ],
+      "ceremony_venue": "Not confirmed exactly this pass (registrar-run convocation, Edmonton).",
+      "ceremony_pattern": "Convocation. Not verified this pass.",
+      "graduate_scale": null,
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "The Commencement Group",
+      "competition": true,
+      "outreach_priority": "medium",
+      "primary_source_url": "https://concordia.ab.ca/student-services/registrar/graduation/convocation/flowers/",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "INCUMBENT CONFIRMED: Concordia's registrar flowers page directs grads to preorder from thecommencementgroup.com/concordiaab. Not whitespace. Convocation run by the Registrar's Office - find the specific convocation email."
+      ]
+    },
+    {
+      "institution_id": "ab-kings",
+      "official_name": "The King's University",
+      "previous_names": [
+        "The King's University College"
+      ],
+      "institution_type": "Independent academic institution (IAI, faith-based)",
+      "status": "active",
+      "city": "Edmonton",
+      "province": "AB",
+      "website": "https://www.kingsu.ca",
+      "domain": "kingsu.ca",
+      "main_phone": "780-465-3500",
+      "main_email": null,
+      "primary_address": "9125 50 St NW, Edmonton, AB T6B 2H3",
+      "relevant_campuses": [
+        "Edmonton (main)"
+      ],
+      "ceremony_venue": "The King's University Athletics Centre / gymnasium (on-campus), Edmonton",
+      "ceremony_pattern": "Single annual Spring Convocation (Saturday, e.g. May 2 2026); reception follows. Small.",
+      "graduate_scale": "Small. Not verified this pass.",
+      "vendor_status": "no_public_vendor_found",
+      "vendor_name": null,
+      "competition": false,
+      "outreach_priority": "low",
+      "primary_source_url": "https://www.kingsu.ca/about-us/calendar/convocation",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "POSSIBLE OPENING: no flower vendor found. Small single ceremony, on-campus gym (King's controls venue). Photos = Images of Distinction. Registration & Student Finance Office + Campus Event Services run convocation."
+      ]
+    },
+    {
+      "institution_id": "ab-stmary",
+      "official_name": "St. Mary's University",
+      "previous_names": [
+        "St. Mary's University College"
+      ],
+      "institution_type": "Independent academic institution (IAI, faith-based)",
+      "status": "active",
+      "city": "Calgary",
+      "province": "AB",
+      "website": "https://www.stmu.ca",
+      "domain": "stmu.ca",
+      "main_phone": "403-531-9130",
+      "main_email": null,
+      "primary_address": "14500 Bannister Rd SE, Calgary, AB T2X 1Z4",
+      "relevant_campuses": [
+        "Calgary (main)"
+      ],
+      "ceremony_venue": null,
+      "ceremony_pattern": "Convocation (small). Not verified this pass.",
+      "graduate_scale": "Small. Not verified this pass.",
+      "vendor_status": "named_vendor_confirmed",
+      "vendor_name": "The Commencement Group",
+      "competition": true,
+      "outreach_priority": "low",
+      "primary_source_url": "https://www.thecommencementgroup.com/stmu/",
+      "last_verified_date": "2026-07-05",
+      "verification_status": "fully_verified_this_pass",
+      "review_flags": [
+        "INCUMBENT CONFIRMED: The Commencement Group runs flowers here (thecommencementgroup.com/stmu). Small Catholic IAI (~1,025 FT students). NAME NOTE: this is St. Mary's CALGARY (stmu.ca), NOT Saint Mary's Halifax (smu.ca). Registrar's Office runs convocation. Complementary/renewal angle only."
+      ]
+    }
+  ]
+}

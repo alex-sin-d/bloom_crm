@@ -30,6 +30,19 @@ import type { Json } from "@/lib/supabase/database.types";
 type RawSearchParams = Record<string, string | string[] | undefined>;
 type OutreachStatus = CrmEnums["outreach_status"];
 
+export const UNIVERSITY_OUTREACH_PROVINCES = ["sask", "alberta"] as const;
+
+export type UniversityOutreachProvince = (typeof UNIVERSITY_OUTREACH_PROVINCES)[number];
+
+export const UNIVERSITY_OUTREACH_COMPETITION_FILTERS = [
+  "all",
+  "no_competition",
+  "has_competition"
+] as const;
+
+export type UniversityOutreachCompetitionFilter =
+  (typeof UNIVERSITY_OUTREACH_COMPETITION_FILTERS)[number];
+
 export const UNIVERSITY_OUTREACH_STATUS_FILTERS = [
   "all",
   "not_contacted",
@@ -55,6 +68,8 @@ export const UNIVERSITY_OUTREACH_SORTS = [
 export type UniversityOutreachSort = (typeof UNIVERSITY_OUTREACH_SORTS)[number];
 
 export type UniversityOutreachSearch = {
+  competition: UniversityOutreachCompetitionFilter;
+  province: UniversityOutreachProvince;
   q?: string;
   sort: UniversityOutreachSort;
   status: UniversityOutreachStatusFilter;
@@ -63,9 +78,15 @@ export type UniversityOutreachSearch = {
 export type UniversityOutreachRow = {
   assignedOwner: ProfileSummary | null;
   campusCount: number | null;
+  ceremonyPattern: string | null;
+  ceremonyVenue: string | null;
   city: string | null;
+  competitionLabel: string;
   contactCount: number;
   country: string | null;
+  domain: string | null;
+  graduateScale: string | null;
+  hasCompetition: boolean | null;
   id: string;
   institutionType: string | null;
   lastContactAt: string | null;
@@ -73,12 +94,22 @@ export type UniversityOutreachRow = {
   name: string;
   nextFollowUp: TaskRow | null;
   organizationType: UniversityOutreachOrganizationType;
+  primaryAddress: string | null;
   priorityLabel: string;
   priorityLevel: string | null;
+  priorityTargetTier: string | null;
+  priorityTargetWhy: string | null;
   province: string | null;
+  recommendedNextAction: string | null;
+  reviewFlagCount: number;
+  sourceInstitutionId: string | null;
   status: OutreachStatus;
   studentPopulation: number | null;
   typeLabel: string;
+  vendorName: string | null;
+  vendorStatus: string | null;
+  verificationStatus: string | null;
+  verifiedContactCount: number;
   website: string | null;
 };
 
@@ -87,9 +118,16 @@ export type UniversityOutreachOverview = {
   rows: UniversityOutreachRow[];
   totals: {
     activeOutreach: number;
+    competition: {
+      all: number;
+      hasCompetition: number;
+      noCompetition: number;
+      unknown: number;
+    };
     contacts: number;
     institutions: number;
     notContacted: number;
+    provinceCounts: Record<UniversityOutreachProvince, number>;
   };
 };
 
@@ -129,11 +167,24 @@ export function parseUniversityOutreachSearch(
 ): UniversityOutreachSearch {
   const status = stringParam(searchParams.status);
   const sort = stringParam(searchParams.sort);
+  const province = stringParam(searchParams.province);
+  const competition = stringParam(searchParams.competition);
+  const parsedProvince = UNIVERSITY_OUTREACH_PROVINCES.includes(province as UniversityOutreachProvince)
+    ? (province as UniversityOutreachProvince)
+    : "sask";
   return {
+    competition: UNIVERSITY_OUTREACH_COMPETITION_FILTERS.includes(
+      competition as UniversityOutreachCompetitionFilter
+    )
+      ? (competition as UniversityOutreachCompetitionFilter)
+      : "all",
+    province: parsedProvince,
     q: stringParam(searchParams.q),
     sort: UNIVERSITY_OUTREACH_SORTS.includes(sort as UniversityOutreachSort)
       ? (sort as UniversityOutreachSort)
-      : "name",
+      : parsedProvince === "alberta"
+        ? "priority"
+        : "name",
     status: UNIVERSITY_OUTREACH_STATUS_FILTERS.includes(
       status as UniversityOutreachStatusFilter
     )
@@ -167,6 +218,36 @@ function textMatches(query: string | undefined, values: Array<string | null | un
 
 function statusMatches(filter: UniversityOutreachStatusFilter, status: OutreachStatus) {
   return filter === "all" || filter === status;
+}
+
+function competitionMatches(
+  filter: UniversityOutreachCompetitionFilter,
+  hasCompetition: boolean | null
+) {
+  if (filter === "all") return true;
+  if (filter === "has_competition") return hasCompetition === true;
+  return hasCompetition === false;
+}
+
+function isAlbertaProvince(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "ab" || normalized === "alberta";
+}
+
+function provinceMatches(province: UniversityOutreachProvince, organization: OrganizationRow) {
+  if (province === "alberta") return isAlbertaProvince(organization.province);
+  return !isAlbertaProvince(organization.province);
+}
+
+function competitionLabel(value: boolean | null | undefined) {
+  if (value === true) return "Has competition";
+  if (value === false) return "No competition";
+  return "Competition unknown";
+}
+
+function jsonStringArray(value: Json | null | undefined) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
 }
 
 function sortTasks(rows: TaskRow[]) {
@@ -371,7 +452,32 @@ async function getRelatedUnits(
   }));
 }
 
-function applyOverviewSort(rows: UniversityOutreachRow[], sort: UniversityOutreachSort) {
+function priorityRank(priority: string | null | undefined) {
+  const rank = new Map([
+    ["strategic", 0],
+    ["high", 1],
+    ["medium", 2],
+    ["low", 3]
+  ]);
+  return rank.get(priority ?? "") ?? 4;
+}
+
+function targetTierRank(tier: string | null | undefined) {
+  const match = tier?.match(/\d+/);
+  return match ? Number(match[0]) : 99;
+}
+
+function competitionRank(value: boolean | null) {
+  if (value === false) return 0;
+  if (value === null) return 1;
+  return 2;
+}
+
+function applyOverviewSort(
+  rows: UniversityOutreachRow[],
+  sort: UniversityOutreachSort,
+  province: UniversityOutreachProvince
+) {
   const sorted = [...rows];
   sorted.sort((left, right) => {
     if (sort === "city") {
@@ -381,15 +487,18 @@ function applyOverviewSort(rows: UniversityOutreachRow[], sort: UniversityOutrea
       );
     }
     if (sort === "priority") {
-      const rank = new Map([
-        ["strategic", 0],
-        ["high", 1],
-        ["medium", 2],
-        ["low", 3]
-      ]);
+      if (province === "alberta") {
+        return (
+          targetTierRank(left.priorityTargetTier) -
+            targetTierRank(right.priorityTargetTier) ||
+          priorityRank(left.priorityLevel) - priorityRank(right.priorityLevel) ||
+          competitionRank(left.hasCompetition) - competitionRank(right.hasCompetition) ||
+          left.name.localeCompare(right.name)
+        );
+      }
       return (
-        (rank.get(left.priorityLevel ?? "") ?? 4) -
-          (rank.get(right.priorityLevel ?? "") ?? 4) ||
+        priorityRank(left.priorityLevel) -
+          priorityRank(right.priorityLevel) ||
         left.name.localeCompare(right.name)
       );
     }
@@ -418,7 +527,14 @@ export async function getUniversityOutreachOverview(
     return {
       filters,
       rows: [],
-      totals: { activeOutreach: 0, contacts: 0, institutions: 0, notContacted: 0 }
+      totals: {
+        activeOutreach: 0,
+        competition: { all: 0, hasCompetition: 0, noCompetition: 0, unknown: 0 },
+        contacts: 0,
+        institutions: 0,
+        notContacted: 0,
+        provinceCounts: { alberta: 0, sask: 0 }
+      }
     };
   }
 
@@ -445,9 +561,16 @@ export async function getUniversityOutreachOverview(
   ]);
 
   const contactCounts = new Map<string, number>();
+  const verifiedContactCounts = new Map<string, number>();
   for (const contact of contacts) {
     if (!contact.organizationId) continue;
     contactCounts.set(contact.organizationId, (contactCounts.get(contact.organizationId) ?? 0) + 1);
+    if (contact.currentStatus === "current") {
+      verifiedContactCounts.set(
+        contact.organizationId,
+        (verifiedContactCounts.get(contact.organizationId) ?? 0) + 1
+      );
+    }
   }
 
   const rows = organizations.map((organization) => {
@@ -459,9 +582,15 @@ export async function getUniversityOutreachOverview(
         ? ownersById.get(organization.assigned_owner_id) ?? null
         : null,
       campusCount: profile?.campus_count ?? null,
+      ceremonyPattern: profile?.ceremony_pattern ?? null,
+      ceremonyVenue: profile?.ceremony_venue ?? null,
       city: organization.city,
+      competitionLabel: competitionLabel(profile?.has_competition ?? null),
       contactCount: contactCounts.get(organization.id) ?? 0,
       country: profile?.country ?? null,
+      domain: profile?.domain ?? null,
+      graduateScale: profile?.graduate_scale ?? null,
+      hasCompetition: profile?.has_competition ?? null,
       id: organization.id,
       institutionType: profile?.institution_type ?? null,
       lastContactAt: mostRecentContactActivity(activitiesByOrganizationId.get(organization.id) ?? []),
@@ -469,17 +598,32 @@ export async function getUniversityOutreachOverview(
       name: organization.name,
       nextFollowUp: tasks.find((task) => task.task_kind === "follow_up") ?? tasks[0] ?? null,
       organizationType: organization.organization_type as UniversityOutreachOrganizationType,
+      primaryAddress: profile?.primary_address ?? organization.address_line_1 ?? null,
       priorityLabel: getUniversityPriorityLabel(profile?.priority_level),
       priorityLevel: profile?.priority_level ?? null,
+      priorityTargetTier: profile?.priority_target_tier ?? null,
+      priorityTargetWhy: profile?.priority_target_why ?? null,
       province: organization.province,
+      recommendedNextAction: profile?.recommended_next_action ?? null,
+      reviewFlagCount: jsonStringArray(profile?.review_flags).length,
+      sourceInstitutionId: profile?.source_institution_id ?? null,
       status,
       studentPopulation: profile?.student_population ?? null,
       typeLabel: getUniversityTypeLabel(organization.organization_type),
+      vendorName: profile?.vendor_name ?? null,
+      vendorStatus: profile?.vendor_status ?? null,
+      verificationStatus: profile?.verification_status ?? null,
+      verifiedContactCount: verifiedContactCounts.get(organization.id) ?? 0,
       website: organization.website
     } satisfies UniversityOutreachRow;
   });
 
-  const filteredRows = rows.filter((row) => {
+  const provinceRows = rows.filter((row) => {
+    const organization = organizations.find((candidate) => candidate.id === row.id)!;
+    return provinceMatches(filters.province, organization);
+  });
+
+  const searchStatusRows = provinceRows.filter((row) => {
     const location = organizationLocation(
       organizations.find((organization) => organization.id === row.id)!,
       profilesByOrganizationId.get(row.id) ?? null
@@ -493,20 +637,50 @@ export async function getUniversityOutreachOverview(
         row.country,
         row.institutionType,
         row.typeLabel,
+        row.vendorName,
+        row.vendorStatus,
+        row.recommendedNextAction,
+        row.ceremonyVenue,
+        row.ceremonyPattern,
+        row.priorityTargetWhy,
+        row.sourceInstitutionId,
         row.assignedOwner?.displayName,
         location
       ])
     );
   });
 
+  const filteredRows = searchStatusRows.filter((row) =>
+    filters.province === "alberta"
+      ? competitionMatches(filters.competition, row.hasCompetition)
+      : true
+  );
+  const provinceCounts = {
+    alberta: rows.filter((row) => {
+      const organization = organizations.find((candidate) => candidate.id === row.id)!;
+      return provinceMatches("alberta", organization);
+    }).length,
+    sask: rows.filter((row) => {
+      const organization = organizations.find((candidate) => candidate.id === row.id)!;
+      return provinceMatches("sask", organization);
+    }).length
+  };
+
   return {
     filters,
-    rows: applyOverviewSort(filteredRows, filters.sort),
+    rows: applyOverviewSort(filteredRows, filters.sort, filters.province),
     totals: {
-      activeOutreach: rows.filter((row) => row.status !== "not_contacted").length,
-      contacts: rows.reduce((total, row) => total + row.contactCount, 0),
-      institutions: rows.length,
-      notContacted: rows.filter((row) => row.status === "not_contacted").length
+      activeOutreach: provinceRows.filter((row) => row.status !== "not_contacted").length,
+      competition: {
+        all: provinceRows.length,
+        hasCompetition: provinceRows.filter((row) => row.hasCompetition === true).length,
+        noCompetition: provinceRows.filter((row) => row.hasCompetition === false).length,
+        unknown: provinceRows.filter((row) => row.hasCompetition === null).length
+      },
+      contacts: provinceRows.reduce((total, row) => total + row.contactCount, 0),
+      institutions: provinceRows.length,
+      notContacted: provinceRows.filter((row) => row.status === "not_contacted").length,
+      provinceCounts
     }
   };
 }

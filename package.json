@@ -16,6 +16,8 @@
     "importer:validate": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/cli.js validate",
     "importer:dry-run": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/cli.js dry-run",
     "importer:local": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/cli.js import",
+    "importer:alberta:dry-run": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/alberta.js dry-run",
+    "importer:alberta": "tsc -p tsconfig.importer.json && node .importer-dist/scripts/importer/alberta.js import",
     "admin:build": "tsc -p tsconfig.admin.json",
     "admin:test": "tsc -p tsconfig.admin.json && node --test .admin-dist/scripts/admin/__tests__/*.test.js",
     "admin:create-user": "tsc -p tsconfig.admin.json && node .admin-dist/scripts/admin/create-app-user.js",

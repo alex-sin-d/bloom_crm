@@ -2,21 +2,14 @@
 
 import {
   assignTask,
+  assignTaskInputSchema,
   completeTaskById,
   createManualTask,
   rescheduleTask,
-  type AssignTaskInput,
   type CreateManualTaskInput,
   type RescheduleTaskInput,
   type TaskActionResult
 } from "@/lib/crm/task-mutations";
-
-export type {
-  AssignTaskInput,
-  CreateManualTaskInput,
-  RescheduleTaskInput,
-  TaskActionResult
-};
 
 export async function createManualTaskAction(
   input: CreateManualTaskInput
@@ -24,8 +17,12 @@ export async function createManualTaskAction(
   return createManualTask(input);
 }
 
-export async function assignTaskAction(input: AssignTaskInput): Promise<TaskActionResult> {
-  return assignTask(input);
+export async function assignTaskAction(input: unknown): Promise<TaskActionResult> {
+  try {
+    return assignTask(assignTaskInputSchema.parse(input));
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not assign task." };
+  }
 }
 
 export async function rescheduleTaskAction(

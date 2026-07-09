@@ -1,0 +1,119 @@
+{
+  "_meta": {
+    "dataset": "alberta_priority_targets",
+    "generated": "2026-07-05",
+    "updated": "2026-07-05 (COMPLETE - all 25 institutions researched)",
+    "generated_for": "Bloom Boys - University Outreach CRM",
+    "methodology": "Grounded in verified vendor findings for all 25 institutions. Tiers reflect: incumbent present or not, grad volume, ease of contact, venue control, and travel/clustering from Saskatoon.",
+    "competition_summary": "9 institutions have a confirmed incumbent flower vendor. The Commencement Group holds 7 (NAIT, MacEwan, SAIT, NorQuest, Concordia, St Mary's Calgary, Lethbridge Polytechnic); two use LOCAL florists that already do a give-back (Red Deer Polytechnic=Stems Flowers; Athabasca=Woodland+Wildflower). The other 16 are open, unnamed/in-house, or guests-only."
+  },
+  "tiers": [
+    {
+      "tier": "1 - Best openings, act first",
+      "rationale": "No commercial incumbent, verified contact, strong fit or lowest travel.",
+      "targets": [
+        {
+          "institution_id": "ab-lakeland",
+          "why": "Lloydminster runs its own ceremony (Lloyd Gymnasium), flowers only via in-house bookstore roses, no pro vendor. Closest AB campus to Saskatoon.",
+          "first_action": "Email Kyla Graham (kyla.graham@lakelandcollege.ca / 1-800-661-6490 x8441) with a managed-stand proposal for Lloydminster."
+        },
+        {
+          "institution_id": "ab-uofa",
+          "why": "Largest volume in AB, single external venue (Jubilee), 3 periods/yr, easy inbox (convocation@ualberta.ca), NO flower vendor.",
+          "first_action": "Email convocation@ualberta.ca; confirm Jubilee retail rules."
+        }
+      ]
+    },
+    {
+      "tier": "2 - Strong openings, verify venue then pursue",
+      "rationale": "No or unnamed vendor and meaningful volume; several have arena/concert-hall venues that may control retail.",
+      "targets": [
+        {
+          "institution_id": "ab-mru",
+          "why": "Non-exclusive vendor concourse (Calgary); easy to join. Contact convocation@mtroyal.ca."
+        },
+        {
+          "institution_id": "ab-nlc",
+          "why": "Surprisingly large & growing (~1,192 grads, going to 2 ceremonies 2027), no vendor. Remote (Slave Lake) + arena venue. Contact records@northernlakescollege.ca."
+        },
+        {
+          "institution_id": "ab-portage",
+          "why": "~1,000-1,200 grads over 4 ceremonies, no vendor. Remote (Lac La Biche). Contact Student Services 1-866-623-5551."
+        },
+        {
+          "institution_id": "ab-uleth",
+          "why": "Unnamed foyer flower vendor (not Commencement Group), southern AB. Verified line 403-320-3323. Pairs with Lethbridge Polytechnic."
+        },
+        {
+          "institution_id": "ab-mhc",
+          "why": "~480 grads, no vendor. Co-op Place arena may control retail. Named contact Jenna Williams jwilliams@mhc.ab.ca."
+        },
+        {
+          "institution_id": "ab-bvc",
+          "why": "No vendor found, Calgary. Jack Singer/Arts Commons venue likely controls retail. Contact grad@bowvalleycollege.ca."
+        },
+        {
+          "institution_id": "ab-olds",
+          "why": "Unnamed foyer vendor, central corridor. Contact info@oldscollege.ca / 403-556-8281."
+        },
+        {
+          "institution_id": "ab-uofc",
+          "why": "Guests/post-ceremony gifting only (grads restricted during ceremony). Contact convinfo@ucalgary.ca."
+        }
+      ]
+    },
+    {
+      "tier": "3 - Small / remote openings, low effort or opportunistic",
+      "rationale": "No vendor but low volume (small privates) or far from any cluster.",
+      "targets": [
+        {
+          "institution_id": "ab-ambrose",
+          "why": "Small Calgary private; church venue."
+        },
+        {
+          "institution_id": "ab-kings",
+          "why": "Small Edmonton private; on-campus gym."
+        },
+        {
+          "institution_id": "ab-aua",
+          "why": "Small Calgary arts school; Southern Jubilee venue."
+        },
+        {
+          "institution_id": "ab-burman",
+          "why": "Small Lacombe private; twice-yearly; church venue; families use delivery florists."
+        },
+        {
+          "institution_id": "ab-keyano",
+          "why": "No vendor, on-campus theatre, but remote (Fort McMurray)."
+        },
+        {
+          "institution_id": "ab-nwp",
+          "why": "No vendor, but remote (Grande Prairie); Grande Prairie + Fairview ceremonies."
+        }
+      ]
+    },
+    {
+      "tier": "4 - Incumbent present - no head-on flower play",
+      "rationale": "Complementary products or contract-renewal timing only.",
+      "commencement_group": [
+        "ab-nait",
+        "ab-macewan",
+        "ab-sait",
+        "ab-norquest",
+        "ab-concordia",
+        "ab-stmary",
+        "ab-lethpoly"
+      ],
+      "local_florist": [
+        {
+          "institution_id": "ab-rdp",
+          "vendor": "Stems Flowers & Cafe (already does alumni give-back)"
+        },
+        {
+          "institution_id": "ab-athabasca",
+          "vendor": "Woodland + Wildflower Weddings (remote)"
+        }
+      ]
+    }
+  ]
+}

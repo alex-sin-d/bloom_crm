@@ -28,8 +28,10 @@ import type { ActivityTimelineEvent } from "@/lib/crm/activity-timeline";
 import type { OrganizationDuplicateWarning } from "@/lib/crm/organization-logic";
 import type {
   UniversityDetail,
+  UniversityOutreachCompetitionFilter,
   UniversityOutreachFormOptions,
   UniversityOutreachOverview,
+  UniversityOutreachProvince,
   UniversityOutreachRow,
   UniversityOutreachSearch,
   UniversityOutreachSort,
@@ -67,6 +69,17 @@ const SORT_OPTIONS: Array<{ label: string; value: UniversityOutreachSort }> = [
   { label: "Outreach status", value: "status" },
   { label: "Next follow-up", value: "next_follow_up" },
   { label: "Last contacted", value: "last_contacted" }
+];
+
+const PROVINCE_OPTIONS: Array<{ label: string; value: UniversityOutreachProvince }> = [
+  { label: "Sask", value: "sask" },
+  { label: "Alberta", value: "alberta" }
+];
+
+const COMPETITION_OPTIONS: Array<{ label: string; value: UniversityOutreachCompetitionFilter }> = [
+  { label: "All", value: "all" },
+  { label: "No Competition", value: "no_competition" },
+  { label: "Has Competition", value: "has_competition" }
 ];
 
 function buttonClassName(tone: "primary" | "secondary" = "secondary") {
@@ -111,6 +124,17 @@ function hrefWithParam(
   });
   const query = next.toString();
   return query ? `/university-outreach?${query}` : "/university-outreach";
+}
+
+function provinceHref(
+  currentParams: URLSearchParams,
+  province: UniversityOutreachProvince
+) {
+  return hrefWithParam(currentParams, {
+    competition: null,
+    province: province === "sask" ? null : province,
+    sort: null
+  });
 }
 
 function detailHrefWithParam(organizationId: string, updates: Record<string, string | null>) {
@@ -171,9 +195,136 @@ function formatNumber(value: number | null) {
   return value === null ? "Not added" : new Intl.NumberFormat("en-US").format(value);
 }
 
+function isAlbertaRow(row: UniversityOutreachRow) {
+  const province = row.province?.trim().toLowerCase();
+  return province === "alberta" || province === "ab" || row.sourceInstitutionId?.startsWith("ab-");
+}
+
+function formatSourceText(value: string | null) {
+  return value ? value.replace(/_/g, " ") : "Not added";
+}
+
+function competitionTone(row: UniversityOutreachRow) {
+  if (row.hasCompetition === true) return "warning" as const;
+  if (row.hasCompetition === false) return "neutral" as const;
+  return "review" as const;
+}
+
+function detailHasCompetition(detail: UniversityDetail) {
+  return detail.profile?.has_competition ?? null;
+}
+
+function competitionLabelFromValue(value: boolean | null | undefined) {
+  if (value === true) return "Has competition";
+  if (value === false) return "No competition";
+  return "Competition unknown";
+}
+
+function competitionToneFromValue(value: boolean | null | undefined) {
+  if (value === true) return "warning" as const;
+  if (value === false) return "neutral" as const;
+  return "review" as const;
+}
+
+function jsonStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+}
+
+function isAlbertaDetail(detail: UniversityDetail) {
+  const province = detail.organization.province?.trim().toLowerCase();
+  return (
+    detail.profile?.source_system === "alberta_university_outreach_json" ||
+    detail.profile?.source_institution_id?.startsWith("ab-") ||
+    province === "alberta" ||
+    province === "ab"
+  );
+}
+
+function ProvinceTabs({
+  currentParams,
+  overview
+}: {
+  currentParams: URLSearchParams;
+  overview: UniversityOutreachOverview;
+}) {
+  return (
+    <nav
+      aria-label="Province"
+      className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-1 shadow-soft"
+    >
+      {PROVINCE_OPTIONS.map((option) => {
+        const active = overview.filters.province === option.value;
+        const count = overview.totals.provinceCounts[option.value];
+        return (
+          <Link
+            aria-current={active ? "page" : undefined}
+            className={[
+              "inline-flex h-10 flex-1 items-center justify-center rounded-control px-4 text-sm font-semibold transition sm:flex-none",
+              active
+                ? "bg-brand-forest !text-white shadow-soft hover:bg-brand-deep focus-visible:!text-white"
+                : "text-text-body hover:bg-surface-subtle"
+            ].join(" ")}
+            href={provinceHref(currentParams, option.value)}
+            key={option.value}
+          >
+            {option.label}
+            <span className={active ? "ml-2 !text-white/80" : "ml-2 text-text-muted"}>{count}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function CompetitionFilter({
+  currentParams,
+  overview
+}: {
+  currentParams: URLSearchParams;
+  overview: UniversityOutreachOverview;
+}) {
+  const counts: Record<UniversityOutreachCompetitionFilter, number> = {
+    all: overview.totals.competition.all,
+    has_competition: overview.totals.competition.hasCompetition,
+    no_competition: overview.totals.competition.noCompetition
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {COMPETITION_OPTIONS.map((option) => {
+        const active = overview.filters.competition === option.value;
+        return (
+          <Link
+            aria-current={active ? "true" : undefined}
+            className={[
+              "inline-flex h-9 items-center rounded-control border px-3 text-sm font-semibold transition",
+              active
+                ? "border-brand-forest bg-brand-forest text-white"
+                : "border-border bg-surface text-text-body hover:border-border-strong hover:bg-surface-subtle"
+            ].join(" ")}
+            href={hrefWithParam(currentParams, {
+              competition: option.value === "all" ? null : option.value,
+              province: "alberta"
+            })}
+            key={option.value}
+          >
+            {option.label}
+            <span className={active ? "ml-2 text-white/80" : "ml-2 text-text-muted"}>
+              {counts[option.value]}
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 function UniversityOutreachFilters({
+  currentParams,
   filters
 }: {
+  currentParams: URLSearchParams;
   filters: UniversityOutreachSearch;
 }) {
   return (
@@ -181,6 +332,12 @@ function UniversityOutreachFilters({
       action="/university-outreach"
       className="rounded-card border border-border bg-surface p-4 shadow-soft"
     >
+      {filters.province !== "sask" ? (
+        <input name="province" type="hidden" value={filters.province} />
+      ) : null}
+      {filters.province === "alberta" && filters.competition !== "all" ? (
+        <input name="competition" type="hidden" value={filters.competition} />
+      ) : null}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto]">
         <label>
           <span className="text-xs font-semibold uppercase text-text-muted">Search</span>
@@ -226,7 +383,12 @@ function UniversityOutreachFilters({
           </button>
           <Link
             className="inline-flex h-10 items-center rounded-control border border-border bg-surface px-4 text-sm font-semibold text-text-body"
-            href="/university-outreach"
+            href={hrefWithParam(currentParams, {
+              competition: null,
+              q: null,
+              sort: null,
+              status: null
+            })}
           >
             Clear
           </Link>
@@ -242,6 +404,7 @@ function OutreachStatusBadge({ status }: { status: CrmEnums["outreach_status"] }
 }
 
 function UniversityCard({ row }: { row: UniversityOutreachRow }) {
+  const alberta = isAlbertaRow(row);
   return (
     <article className="rounded-card border border-border bg-surface p-4 shadow-soft">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -259,18 +422,39 @@ function UniversityCard({ row }: { row: UniversityOutreachRow }) {
             {[row.city, row.province, row.country].filter(Boolean).join(", ") || "Location not added"}
           </p>
         </div>
-        <OutreachStatusBadge status={row.status} />
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          {alberta ? <StatusBadge tone={competitionTone(row)}>{row.competitionLabel}</StatusBadge> : null}
+          {row.reviewFlagCount > 0 ? <StatusBadge tone="review">{row.reviewFlagCount} review</StatusBadge> : null}
+          <OutreachStatusBadge status={row.status} />
+        </div>
       </div>
 
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-        <InfoLine label="Contacts" value={row.contactCount} />
+        <InfoLine
+          label={alberta ? "Verified contacts" : "Contacts"}
+          value={alberta ? `${row.verifiedContactCount}/${row.contactCount}` : row.contactCount}
+        />
         <InfoLine label="Priority" value={row.priorityLabel} />
-        <InfoLine label="Next follow-up" value={row.nextFollowUp ? formatDate(row.nextFollowUp.due_date) : "None"} />
+        <InfoLine
+          label={alberta ? "Target tier" : "Next follow-up"}
+          value={alberta ? (row.priorityTargetTier ?? "Not set") : row.nextFollowUp ? formatDate(row.nextFollowUp.due_date) : "None"}
+        />
       </dl>
 
       <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-        <InfoLine label="Last contact" value={row.lastContactAt ? formatDateTime(row.lastContactAt) : "No contact logged"} />
-        <InfoLine label="Team member" value={row.assignedOwner?.displayName ?? "Unassigned"} />
+        {alberta ? (
+          <>
+            <InfoLine label="Vendor status" value={formatSourceText(row.vendorStatus)} />
+            <InfoLine label="Vendor" value={row.vendorName ?? "No named incumbent"} />
+            <InfoLine label="Ceremony venue" value={row.ceremonyVenue ?? "Not added"} />
+            <InfoLine label="Graduate scale" value={row.graduateScale ?? "Not added"} />
+          </>
+        ) : (
+          <>
+            <InfoLine label="Last contact" value={row.lastContactAt ? formatDateTime(row.lastContactAt) : "No contact logged"} />
+            <InfoLine label="Team member" value={row.assignedOwner?.displayName ?? "Unassigned"} />
+          </>
+        )}
         <InfoLine label="Main phone" value={row.mainPhone ?? "Not added"} />
         <InfoLine
           label="Website"
@@ -285,6 +469,12 @@ function UniversityCard({ row }: { row: UniversityOutreachRow }) {
           }
         />
       </div>
+
+      {alberta && row.recommendedNextAction ? (
+        <p className="mt-4 rounded-control border border-border bg-surface-subtle px-3 py-2 text-sm leading-6 text-text-body">
+          {row.recommendedNextAction}
+        </p>
+      ) : null}
 
       <div className="mt-4">
         <Link
@@ -314,12 +504,12 @@ function UniversityCards({
         </h2>
         <p className="mt-2 text-sm text-text-muted">
           {hasRecords
-            ? "Try clearing the search or choosing a different outreach status."
+            ? "Try clearing the search or choosing a different outreach or competition filter."
             : "Add the first university or postsecondary institution when you are ready."}
         </p>
         <Link
           className={`${buttonClassName("primary")} mt-4`}
-          href={hrefWithParam(currentParams, hasRecords ? { q: null, sort: null, status: null } : { add: "1" })}
+          href={hrefWithParam(currentParams, hasRecords ? { competition: null, q: null, sort: null, status: null } : { add: "1" })}
         >
           {hasRecords ? "Clear filters" : "Add University"}
         </Link>
@@ -351,6 +541,8 @@ export function UniversityOutreachWorkspace({
 
   return (
     <div className="space-y-5">
+      <ProvinceTabs currentParams={currentParams} overview={overview} />
+
       <section className="grid gap-3 md:grid-cols-4">
         <SummaryCard label="University records" value={overview.totals.institutions} />
         <SummaryCard label="Not contacted" value={overview.totals.notContacted} />
@@ -364,11 +556,15 @@ export function UniversityOutreachWorkspace({
         </Link>
       </div>
 
-      <UniversityOutreachFilters filters={overview.filters} />
+      <UniversityOutreachFilters currentParams={currentParams} filters={overview.filters} />
+      {overview.filters.province === "alberta" ? (
+        <CompetitionFilter currentParams={currentParams} overview={overview} />
+      ) : null}
       <UniversityCards currentParams={currentParams} overview={overview} />
 
       {showAdd ? (
         <UniversityFormModal
+          defaultProvince={overview.filters.province}
           formOptions={formOptions}
           mode="create"
           onClose={() => router.push(hrefWithParam(currentParams, { add: null }))}
@@ -378,12 +574,15 @@ export function UniversityOutreachWorkspace({
   );
 }
 
-function initialInput(detail?: UniversityDetail): CreateUniversityInput {
+function initialInput(
+  detail?: UniversityDetail,
+  defaultProvince?: UniversityOutreachProvince
+): CreateUniversityInput {
   return {
     assignedOwnerId: detail?.organization.assigned_owner_id ?? null,
     campusCount: detail?.profile?.campus_count ?? null,
     city: detail?.organization.city ?? null,
-    country: detail?.profile?.country ?? null,
+    country: detail?.profile?.country ?? (defaultProvince === "alberta" ? "Canada" : null),
     institutionType: detail?.profile?.institution_type ?? null,
     internalNotes: detail?.organization.internal_notes ?? null,
     mainEmail: detail?.generalEmail ?? null,
@@ -394,7 +593,7 @@ function initialInput(detail?: UniversityDetail): CreateUniversityInput {
       ? detail.organization.organization_type
       : "university",
     priorityLevel: detail?.profile?.priority_level ?? null,
-    province: detail?.organization.province ?? null,
+    province: detail?.organization.province ?? (defaultProvince === "alberta" ? "Alberta" : null),
     studentPopulation: detail?.profile?.student_population ?? null,
     website: detail?.organization.website ?? null
   };
@@ -427,11 +626,13 @@ function universityInputFromForm(form: FormData): CreateUniversityInput {
 }
 
 function UniversityFormModal({
+  defaultProvince,
   detail,
   formOptions,
   mode,
   onClose
 }: {
+  defaultProvince?: UniversityOutreachProvince;
   detail?: UniversityDetail;
   formOptions: UniversityOutreachFormOptions;
   mode: "create" | "edit";
@@ -443,7 +644,7 @@ function UniversityFormModal({
   const [warning, setWarning] = useState<OrganizationDuplicateWarning | null>(null);
   const [pendingCreateInput, setPendingCreateInput] = useState<CreateUniversityInput | null>(null);
   const [confirmSensitiveChange, setConfirmSensitiveChange] = useState(false);
-  const initial = initialInput(detail);
+  const initial = initialInput(detail, defaultProvince);
 
   const submitUniversity = (input: CreateUniversityInput, createAnyway = false) => {
     setError(null);
@@ -744,6 +945,84 @@ function contactRoleOptionsFor(detail: UniversityDetail) {
     }));
 }
 
+function AlbertaResearchSection({ detail }: { detail: UniversityDetail }) {
+  if (!isAlbertaDetail(detail)) return null;
+
+  const profile = detail.profile;
+  const sourceUrls = jsonStringArray(profile?.source_urls);
+  const reviewFlags = jsonStringArray(profile?.review_flags);
+  const campuses = jsonStringArray(profile?.relevant_campuses);
+
+  return (
+    <DetailSection title="Alberta research">
+      <div className="space-y-4">
+        <dl className="grid gap-4 md:grid-cols-2">
+          <InfoLine label="Recommended first contact" value={profile?.recommended_first_contact ?? "Not added"} />
+          <InfoLine label="Recommended next action" value={profile?.recommended_next_action ?? "Not added"} />
+          <InfoLine label="Vendor status" value={formatSourceText(profile?.vendor_status ?? null)} />
+          <InfoLine label="Vendor" value={profile?.vendor_name ?? "No named incumbent"} />
+          <InfoLine label="Venue authority" value={profile?.venue_authority_status ?? "Not added"} />
+          <InfoLine label="Information still missing" value={profile?.information_still_missing ?? "Not added"} />
+        </dl>
+
+        {profile?.working_notes || profile?.research_notes ? (
+          <div className="grid gap-3 text-sm md:grid-cols-2">
+            {profile.working_notes ? (
+              <div className="rounded-control border border-border bg-surface-subtle p-3">
+                <h3 className="text-xs font-semibold uppercase text-text-muted">Working notes</h3>
+                <p className="mt-2 leading-6 text-text-body">{profile.working_notes}</p>
+              </div>
+            ) : null}
+            {profile.research_notes ? (
+              <div className="rounded-control border border-border bg-surface-subtle p-3">
+                <h3 className="text-xs font-semibold uppercase text-text-muted">Research notes</h3>
+                <p className="mt-2 leading-6 text-text-body">{profile.research_notes}</p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {campuses.length > 0 ? (
+          <div>
+            <h3 className="text-xs font-semibold uppercase text-text-muted">Relevant campuses</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {campuses.map((campus) => (
+                <StatusBadge key={campus}>{campus}</StatusBadge>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {reviewFlags.length > 0 ? (
+          <div>
+            <h3 className="text-xs font-semibold uppercase text-text-muted">Review flags</h3>
+            <ul className="mt-2 space-y-2 text-sm leading-6 text-text-body">
+              {reviewFlags.map((flag) => (
+                <li className="rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900" key={flag}>
+                  {flag}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {sourceUrls.length > 0 ? (
+          <div>
+            <h3 className="text-xs font-semibold uppercase text-text-muted">Source URLs</h3>
+            <div className="mt-2 grid gap-2 text-sm">
+              {sourceUrls.map((url) => (
+                <Link className="break-all text-brand-forest" href={url} key={url}>
+                  {url}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </DetailSection>
+  );
+}
+
 export function UniversityDetailWorkspace({
   activityEvents,
   detail,
@@ -768,6 +1047,8 @@ export function UniversityDetailWorkspace({
   const outreachRouteLabel = getUniversityRouteLabel(
     detail.outreachSummary.outreachRow?.outreach_route ?? null
   );
+  const albertaDetail = isAlbertaDetail(detail);
+  const competitionValue = detailHasCompetition(detail);
 
   return (
     <div className="space-y-5">
@@ -776,6 +1057,11 @@ export function UniversityDetailWorkspace({
           <div>
             <div className="flex flex-wrap gap-2">
               <StatusBadge>{getUniversityTypeLabel(detail.organization.organization_type)}</StatusBadge>
+              {albertaDetail ? (
+                <StatusBadge tone={competitionToneFromValue(competitionValue)}>
+                  {competitionLabelFromValue(competitionValue)}
+                </StatusBadge>
+              ) : null}
               <StatusBadge tone={getOutreachStatusDisplay(detail.outreachSummary.outreachRow?.outreach_status ?? "not_contacted").tone}>
                 {outreachStatusLabel}
               </StatusBadge>
@@ -845,12 +1131,27 @@ export function UniversityDetailWorkspace({
           <InfoLine label="Campuses" value={formatNumber(detail.profile?.campus_count ?? null)} />
           <InfoLine label="Priority" value={getUniversityPriorityLabel(detail.profile?.priority_level)} />
           <InfoLine label="Assigned team member" value={detail.owner?.displayName ?? "Unassigned"} />
+          {albertaDetail ? (
+            <>
+              <InfoLine label="Source ID" value={detail.profile?.source_institution_id ?? "Not added"} />
+              <InfoLine label="Domain" value={detail.profile?.domain ?? "Not added"} />
+              <InfoLine label="Primary address" value={detail.profile?.primary_address ?? detail.organization.address_line_1 ?? "Not added"} />
+              <InfoLine label="Ceremony venue" value={detail.profile?.ceremony_venue ?? "Not added"} />
+              <InfoLine label="Ceremony pattern" value={detail.profile?.ceremony_pattern ?? "Not added"} />
+              <InfoLine label="Graduate scale" value={detail.profile?.graduate_scale ?? "Not added"} />
+              <InfoLine label="Vendor status" value={formatSourceText(detail.profile?.vendor_status ?? null)} />
+              <InfoLine label="Vendor" value={detail.profile?.vendor_name ?? "No named incumbent"} />
+              <InfoLine label="Verification" value={formatSourceText(detail.profile?.verification_status ?? null)} />
+            </>
+          ) : null}
           <InfoLine label="Notes" value={detail.organization.internal_notes ?? "Not added"} />
         </dl>
       </CollapsibleSection>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <div className="space-y-5">
+          <AlbertaResearchSection detail={detail} />
+
           <DetailSection title="Open tasks">
             <div className="space-y-3">
               <p className="text-sm text-text-muted">

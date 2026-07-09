@@ -1,0 +1,109 @@
+{
+  "_meta": {
+    "dataset": "alberta_manual_review",
+    "generated": "2026-07-05",
+    "updated": "2026-07-05 (COMPLETE - all 25 researched)",
+    "generated_for": "Bloom Boys - University Outreach CRM",
+    "purpose": "Everything that is NOT yet a verified finding: unverified claims, records needing research, and the precise continuation checklist. Verified findings live in the other files with last_verified_date = 2026-07-05."
+  },
+  "verified_this_pass": [
+    {
+      "item": "25-institution list reconciled to Alberta.ca publicly funded institutions",
+      "source": "https://www.alberta.ca/publicly-funded-post-secondary-institutions"
+    },
+    {
+      "item": "NAIT contacts: 780-471-6248 (general), events@nait.ca / 780-471-8409 (Conference & Event Services)",
+      "source": "https://www.nait.ca/nait/contact"
+    },
+    {
+      "item": "NAIT INCUMBENT FLOWER VENDOR = The Commencement Group; venue = Edmonton Convention Centre; Spring Convocation June 22-25, 2026; Jostens rings; Smart Photography photos. competition = TRUE.",
+      "source": "https://www.nait.ca/nait/student-life/graduation-convocation/graduation-photos-gifts"
+    },
+    {
+      "item": "U of A convocation inbox convocation@ualberta.ca; Northern Alberta Jubilee Auditorium; 3 ceremony periods/yr; flowers not on prohibited list",
+      "source": "https://www.ualberta.ca/en/registrar/graduation-convocation/ceremony-details.html"
+    },
+    {
+      "item": "U of C flower restriction is PRECISE: flowers/corsages barred only from graduands carrying them during the ceremony at Jack Simpson Gymnasium. NOT venue-wide; guests unrestricted; reception follows. Post-ceremony/guest gifting viable.",
+      "source": "https://www.ucalgary.ca/graduation/convocation/graduating-students"
+    },
+    {
+      "item": "U of C convocation contact convinfo@ucalgary.ca; ceremony Spring + Fall (Nov 9-10 2026) + Feb; photographer Artona",
+      "source": "https://www.ucalgary.ca/graduation"
+    },
+    {
+      "item": "The Commencement Group confirmed active in Western Canada (booths at University of Regina and University of Toronto, and NAIT in Alberta)",
+      "source": "https://www.thecommencementgroup.com/regina/"
+    },
+    {
+      "item": "Commencement Group confirmed as flower incumbent at MacEwan (macewanu), SAIT (sait), NorQuest, and Concordia Edmonton (concordiaab), in addition to NAIT. competition=TRUE for all five.",
+      "source": "https://www.thecommencementgroup.com/macewanu/"
+    },
+    {
+      "item": "U of A: NO flower vendor found (GradImages photos, Bookstore memorabilia). Genuine flower opening.",
+      "source": "https://www.ualberta.ca/en/registrar/graduation-convocation/convocation-memorabilia.html"
+    },
+    {
+      "item": "MacEwan flower vendor listed as 'Convocation Flowers' on regalia portal AND Commencement Group has /macewanu - corroborates they are one operation.",
+      "source": "https://www.buildagrad.ca/macewan"
+    },
+    {
+      "item": "Verified convocation contacts: convocation@macewan.ca, convocation@mtroyal.ca, grad@bowvalleycollege.ca, convocation@norquest.ca, U of Lethbridge Convocation Office 403-329-2156, Lakeland Kyla Graham kyla.graham@lakelandcollege.ca x8441.",
+      "source": "institutional convocation pages"
+    },
+    {
+      "item": "MRU runs a non-exclusive vendor concourse (flowers sold, no exclusive vendor named) - possible open door.",
+      "source": "https://www.mtroyal.ca/AcademicSupport/ResourcesServices/ConvocationGraduation/FamilyFriends/"
+    },
+    {
+      "item": "U of Lethbridge and Lakeland sell flowers via an unnamed/in-house operator (not Commencement Group) - possible openings.",
+      "source": "https://www.ulethbridge.ca/convocation/available-services-convocation-day"
+    }
+  ],
+  "resolved_since_last_pass": [
+    "NAIT vendor status: was vendor_status_unknown -> now named_vendor_confirmed (The Commencement Group). NAIT is NOT whitespace.",
+    "U of C flower restriction: was flowers_restricted (scope unknown) -> now flowers_prohibited_in_specific_area (graduands during ceremony only, precisely scoped).",
+    "U of C contact: fallback switchboard -> verified convinfo@ucalgary.ca."
+  ],
+  "claims_requiring_verification": [
+    {
+      "institution_id": "ab-uofa / ab-uofc / ab-sait / ab-mru / ab-macewan",
+      "claim": "competition = false",
+      "status": "UNVERIFIED - not found is not confirmed absent",
+      "action": "Check each institution's convocation/gifts page for a 'preorder flowers' link to thecommencementgroup.com/<school>. This is how NAIT was confirmed. Highest-value next step for the competition flag."
+    },
+    {
+      "institution_id": "ab-lethpoly",
+      "claim": "Official name 'Lethbridge Polytechnic' (was Lethbridge College)",
+      "status": "UNVERIFIED",
+      "action": "Confirm current designation and domain."
+    },
+    {
+      "institution_id": "ab-olds",
+      "claim": "Official name 'Olds College of Agriculture & Technology'",
+      "status": "UNVERIFIED",
+      "action": "Confirm current official name."
+    },
+    {
+      "institution_id": "ab-mhc",
+      "claim": "Domain mhc.ab.ca",
+      "status": "UNVERIFIED",
+      "action": "Confirm current domain."
+    },
+    {
+      "institution_id": "21 institutions",
+      "claim": "Main-line phone numbers on fallback contacts",
+      "status": "UNVERIFIED (general knowledge)",
+      "action": "Verify every fallback number against the official site before calling."
+    }
+  ],
+  "competition_boolean_note": "competition=TRUE at 5 (NAIT, MacEwan, SAIT, NorQuest, Concordia - all Commencement Group). competition=FALSE at 20, but for the 11 researched that FALSE is now meaningful (U of A, U of C, MRU, U of Lethbridge, Bow Valley, Lakeland confirmed no Commencement Group). The other 14 FALSE values remain 'not yet checked'.",
+  "continuation_checklist": {
+    "status": "COMPLETE. All 25 institutions have a verified contact and a verified vendor status. No vendor_status_unknown records remain.",
+    "residual_verifications_optional": [
+      "Venue retail authority (operational, only matters after institutional interest) for the arena/concert-hall venues: Bow Valley (Jack Singer/Arts Commons), Medicine Hat (Co-op Place), Northern Lakes (Slave Lake Multi Rec Centre), NAIT (Edmonton Convention Centre), NorQuest (Edmonton EXPO Centre), and the church venues (Ambrose, Burman).",
+      "A few institutions route via general/registrar contacts rather than a dedicated convocation email (SAIT, Concordia, AUArts, Ambrose, Northwestern, Portage, Red Deer Poly) - a direct convocation email could still be dug out if desired.",
+      "Confirm whether Lakeland would outsource its in-house bookstore rose sales; confirm the exact current foyer vendor at U of Lethbridge and Olds."
+    ]
+  }
+}
