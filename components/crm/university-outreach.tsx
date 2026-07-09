@@ -85,14 +85,14 @@ const COMPETITION_OPTIONS: Array<{ label: string; value: UniversityOutreachCompe
 function buttonClassName(tone: "primary" | "secondary" = "secondary") {
   const base =
     "inline-flex h-10 items-center justify-center rounded-control px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60";
-  if (tone === "primary") return `${base} bg-brand-forest text-white hover:bg-brand-deep`;
+  if (tone === "primary") return `${base} bg-brand-forest !text-white hover:bg-brand-deep focus-visible:!text-white`;
   return `${base} border border-border bg-surface text-text-body hover:border-border-strong hover:bg-surface-subtle`;
 }
 
 function smallButtonClassName(tone: "primary" | "secondary" = "secondary") {
   const base =
     "inline-flex h-8 items-center justify-center rounded-control px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60";
-  if (tone === "primary") return `${base} bg-brand-forest text-white hover:bg-brand-deep`;
+  if (tone === "primary") return `${base} bg-brand-forest !text-white hover:bg-brand-deep focus-visible:!text-white`;
   return `${base} border border-border bg-surface text-text-body hover:border-border-strong hover:bg-surface-subtle`;
 }
 
@@ -300,7 +300,7 @@ function CompetitionFilter({
             className={[
               "inline-flex h-9 items-center rounded-control border px-3 text-sm font-semibold transition",
               active
-                ? "border-brand-forest bg-brand-forest text-white"
+                ? "border-brand-forest bg-brand-forest !text-white hover:bg-brand-deep focus-visible:!text-white"
                 : "border-border bg-surface text-text-body hover:border-border-strong hover:bg-surface-subtle"
             ].join(" ")}
             href={hrefWithParam(currentParams, {
@@ -310,7 +310,7 @@ function CompetitionFilter({
             key={option.value}
           >
             {option.label}
-            <span className={active ? "ml-2 text-white/80" : "ml-2 text-text-muted"}>
+            <span className={active ? "ml-2 !text-white/80" : "ml-2 text-text-muted"}>
               {counts[option.value]}
             </span>
           </Link>
@@ -378,7 +378,7 @@ function UniversityOutreachFilters({
           </select>
         </label>
         <div className="flex items-end gap-2">
-          <button className="h-10 rounded-control bg-brand-forest px-4 text-sm font-semibold text-white" type="submit">
+          <button className="h-10 rounded-control bg-brand-forest px-4 text-sm font-semibold !text-white hover:bg-brand-deep focus-visible:!text-white" type="submit">
             Apply
           </button>
           <Link
